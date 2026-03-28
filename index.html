@@ -19,9 +19,9 @@
     <div class="app-shell">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <div class="sidebar-brand">
-                <i class="fas fa-futbol"></i>
-                <span>19 de Junio</span>
+            <div class="sidebar-brand" style="flex-direction: column; text-align: center; gap: 0.5rem; padding-bottom: 2rem;">
+                <img src="img/logo.png" alt="Logo Club" style="max-width: 100px; height: auto; border-radius: 50%;">
+                <span style="font-family: 'Outfit', sans-serif; letter-spacing: 1px;">19 DE JUNIO</span>
             </div>
             <nav class="nav-links">
                 <a href="#dashboard" class="nav-link active" data-view="dashboard">
@@ -80,8 +80,11 @@
                     </div>
                 </div>
                 
-                <div class="card" style="min-height: 400px;">
-                    <canvas id="mainChart"></canvas>
+                <div class="card" style="min-height: 200px; display: flex; align-items: center; justify-content: center; text-align: center;">
+                    <div>
+                        <img src="img/logo.png" style="width: 80px; opacity: 0.1; filter: grayscale(1);">
+                        <p class="text-muted" style="margin-top: 1rem;">Cargando datos del club...</p>
+                    </div>
                 </div>
             </div>
         </main>

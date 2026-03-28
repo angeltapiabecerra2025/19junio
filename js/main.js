@@ -100,26 +100,32 @@ function renderDashboard(container) {
                 <label><i class="fas fa-times-circle"></i> Perdidos (P)</label>
                 <h2 id="loss-count">${calculateMatches('P')}</h2>
             </div>
-            <div class="card" style="border-top: 4px solid var(--warning);">
-                <label><i class="fas fa-handshake"></i> Empatados (E)</label>
-                <h2 id="draws-count">${calculateMatches('E')}</h2>
-            </div>
-            <div class="card" style="border-top: 4px solid var(--success);">
-                <label><i class="fas fa-cash-register"></i> Ingresos Ventas</label>
-                <h2 id="weekly-sales-stat">$${totalSales.toLocaleString()}</h2>
+            <div class="card" style="border-top: 4px solid var(--primary-blue); text-align: center;">
+                <img src="img/logo.png" style="width: 100px; margin-bottom: 1rem; border-radius: 50%;">
+                <h3>Club de Fútbol 19 de Junio</h3>
+                <p class="text-muted">Sistema de Gestión Elite</p>
             </div>
         </div>
         
         <div class="card" style="margin-top: 2rem; border-left: 4px solid var(--primary-blue);">
-            <h3>Resumen Administrativo</h3>
-            <p class="text-muted" style="margin-top: 0.5rem;">Bienvenido al panel de gestión del Club 19 de Junio. Utiliza el menú lateral para navegar por los módulos de partidos, inventario y finanzas.</p>
-            <div style="margin-top: 1.5rem; display: flex; gap: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div>
-                    <label>Socios al día</label>
-                    <h3>${activeSocios} / ${state.socios.length}</h3>
+                    <h3>Resumen Administrativo</h3>
+                    <p class="text-muted" style="margin-top: 0.5rem;">Panel centralizado para el control de finanzas y estadísticas.</p>
+                </div>
+                <div style="text-align: right;">
+                    <label>Estado de Caja</label>
+                    <h2 style="color: var(--success);">$${totalSales.toLocaleString()}</h2>
+                </div>
+            </div>
+            
+            <div style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; border-top: 1px solid var(--border-clr); padding-top: 1.5rem;">
+                <div>
+                    <label><i class="fas fa-users"></i> Socios Activos</label>
+                    <h3 style="color: var(--primary-blue);">${activeSocios} / ${state.socios.length}</h3>
                 </div>
                 <div>
-                    <label>Esgreso en Compras</label>
+                    <label><i class="fas fa-shopping-cart"></i> Inversión en Stock</label>
                     <h3 style="color: var(--secondary-red);">$${state.inventory.purchases.reduce((a, b) => a + b.cost, 0).toLocaleString()}</h3>
                 </div>
             </div>
@@ -166,6 +172,40 @@ window.app.deletePurchase = (index) => safeAction(() => {
   if (prod) prod.stock -= p.quantity;
   state.inventory.purchases.splice(index, 1);
 }, { module: 'Compras', item: state.inventory.purchases[index] });
+
+window.app.restoreItem = (index) => {
+    if (!confirm("¿Desea restaurar este elemento a su ubicación original?")) return;
+    const log = state.auditLog[index];
+    const item = JSON.parse(log.itemData);
+    
+    try {
+        switch(log.module) {
+            case 'Partidos': state.matches.push(item); break;
+            case 'Productos': state.inventory.products.push(item); break;
+            case 'Ventas': 
+                const pV = state.inventory.products.find(prod => prod.id === item.productId);
+                if (pV) pV.stock -= item.quantity;
+                state.inventory.sales.push(item);
+                break;
+            case 'Socios': state.socios.push(item); break;
+            case 'Fiados': state.finances.fiados.push(item); break;
+            case 'Camisetas': state.finances.jerseys.push(item); break;
+            case 'GastosVarios': state.finances.misc.push(item); break;
+            case 'Compras':
+                const pC = state.inventory.products.find(prod => prod.id === item.productId);
+                if (pC) pC.stock += item.quantity;
+                state.inventory.purchases.push(item);
+                break;
+        }
+        
+        state.auditLog.splice(index, 1);
+        saveState(state);
+        renderView(app.currentView);
+        alert("Elemento restaurado con éxito.");
+    } catch (e) {
+        alert("Error al restaurar: Es posible que los datos ya no sean compatibles.");
+    }
+};
 
 // --- Placeholder Renders for remaining modules ---
 function calculateMatches(type) {
@@ -884,15 +924,21 @@ function renderConfig(container) {
                             <th>Fecha/Hora</th>
                             <th>Módulo</th>
                             <th>Datos Eliminados</th>
+                            <th>Acción</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${state.auditLog.map(log => `
+                        ${state.auditLog.map((log, i) => `
                             <tr>
-                                <td style="white-space: nowrap;">${log.timestamp}</td>
-                                <td><span class="badge badge-danger">${log.module}</span></td>
-                                <td style="font-size: 0.75rem; color: var(--text-muted); max-width: 400px; overflow: hidden; text-overflow: ellipsis;">
+                                <td style="white-space: nowrap; font-size: 0.8rem;">${log.timestamp}</td>
+                                <td><span class="badge badge-danger" style="font-size: 0.7rem;">${log.module}</span></td>
+                                <td style="font-size: 0.75rem; color: var(--text-muted); max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
                                     ${log.itemData}
+                                </td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm" onclick="app.restoreItem(${state.auditLog.length - 1 - i})" title="Restaurar Registro">
+                                        <i class="fas fa-undo"></i> Restaurar
+                                    </button>
                                 </td>
                             </tr>
                         `).reverse().join('')}
