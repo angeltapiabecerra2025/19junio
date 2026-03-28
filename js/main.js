@@ -7,6 +7,7 @@ let state = loadState();
 const app = {
     currentView: 'dashboard',
     chart: null,
+    lastSaleTotal: 0
 };
 
 // --- Initialization ---
@@ -476,7 +477,7 @@ function renderVentas(container) {
             <h3>Calculadora de Vuelto</h3>
             <div class="form-group">
                 <label>Total Compra</label>
-                <input type="number" id="calc-total" placeholder="0">
+                <input type="number" id="calc-total" value="${app.lastSaleTotal || 0}" placeholder="0">
             </div>
             <div class="form-group">
                 <label>Paga con</label>
@@ -532,8 +533,7 @@ function renderVentas(container) {
       
       safeAction(() => {
           product.stock -= qty;
-          const totalCompraInput = document.getElementById('calc-total');
-          if (totalCompraInput) totalCompraInput.value = total;
+          app.lastSaleTotal = total; // Store for next render
           
           state.inventory.sales.push({
               date: new Date().toLocaleString(),
@@ -552,12 +552,15 @@ function renderVentas(container) {
   const resDisp = document.getElementById('calc-result');
   
   const updCalc = () => {
-      const diff = (parseInt(pIn.value) || 0) - (parseInt(tIn.value) || 0);
+      const totalVal = parseInt(tIn.value) || 0;
+      const paidVal = parseInt(pIn.value) || 0;
+      const diff = paidVal - totalVal;
       resDisp.innerText = `$${diff.toLocaleString()} CLP`;
   };
   
   tIn.oninput = updCalc;
   pIn.oninput = updCalc;
+  updCalc(); // Initial run on render
 }
 
 function renderSocios(container) { 
