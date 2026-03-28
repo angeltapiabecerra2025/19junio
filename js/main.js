@@ -69,6 +69,10 @@ function renderView(viewId) {
             title.innerText = 'Módulo de Ventas';
             renderVentas(container);
             break;
+        case 'socios':
+            title.innerText = 'Socios y Cuotas';
+            renderSocios(container);
+            break;
         case 'camisetas':
             title.innerText = 'Ingresos por Camisetas';
             renderCamisetas(container);
@@ -571,11 +575,46 @@ function renderVentas(container) {
   updCalc(); // Initial run on render
 }
 
+function calculateSocioDebt(socio) {
+  const fee = 5000;
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  
+  const cycleMonths = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "01", "02"];
+  const currentMonthKey = (now.getMonth() + 1).toString().padStart(2, '0');
+  
+  const joinDate = new Date(socio.joinDate);
+  const joinMonthKey = (joinDate.getMonth() + 1).toString().padStart(2, '0');
+  const joinYear = joinDate.getFullYear();
+
+  let debt = 0;
+  let startedCounting = false;
+
+  for (const m of cycleMonths) {
+      const year = (parseInt(m) < 3) ? currentYear + (currentYear > joinYear ? 0 : 1) : currentYear;
+      const key = `${currentYear}-${m}`;
+      
+      // Start counting if we reached the join month OR if we are past the join month in the cycle
+      if (!startedCounting) {
+          if (m === joinMonthKey) startedCounting = true;
+          // Note: This is simpler for a single-year cycle.
+      }
+
+      if (startedCounting || parseInt(m) >= 3 || (joinYear < currentYear)) {
+          // If the month is in the past relative to now in the cycle
+          if (!socio.payments[key]) debt += fee;
+      }
+
+      if (m === currentMonthKey) break;
+  }
+  return debt;
+}
+
 function renderSocios(container) { 
   container.innerHTML = `
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3>Listado de Socios</h3>
+            <h3>Listado de Socios (Ciclo Mar-Feb)</h3>
             <button class="btn btn-primary btn-sm" onclick="app.showAddSocio()">
                 <i class="fas fa-user-plus"></i> Nuevo Socio
             </button>
@@ -597,7 +636,7 @@ function renderSocios(container) {
                         return `
                         <tr>
                             <td>${s.name}</td>
-                            <td><span class="badge ${debt === 0 ? 'badge-paid' : 'badge-danger'}">${debt === 0 ? 'Al día' : 'Pendiente'}</span></td>
+                            <td><span class="badge ${debt === 0 ? 'badge-paid' : 'badge-danger'}">${debt === 0 ? 'Al día' : 'Deuda'}</span></td>
                             <td>$${debt.toLocaleString()}</td>
                             <td>
                                 <button class="btn btn-primary btn-sm" onclick="app.showPaySocio('${s.id}')">
@@ -606,7 +645,7 @@ function renderSocios(container) {
                                 <button class="btn btn-outline btn-sm" onclick="app.showEditSocio('${s.id}')">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-outline btn-sm" onclick="app.deleteSocio('${s.id}')">
+                                <button class="btn btn-outline btn-sm" onclick="app.deleteSocio('${s.id}')" title="Eliminar Socio">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </td>
@@ -645,8 +684,19 @@ window.app.showEditSocio = (id) => {
         safeAction(() => {
             socio.name = newName;
             document.getElementById('modal-root').innerHTML = '';
+            renderView('socios');
         });
     };
+};
+
+window.app.deleteSocio = (id) => {
+    const socioIdx = state.socios.findIndex(s => s.id === id);
+    const socio = state.socios[socioIdx];
+    safeAction(() => {
+        state.socios.splice(socioIdx, 1);
+        renderView('socios');
+        saveState(state);
+    }, { module: 'Socios', itemData: `Socio: ${socio.name} (ID: ${socio.id})` });
 };
 
 window.app.showAddSocio = () => {
@@ -708,9 +758,22 @@ window.app.showPaySocio = (id) => {
         e.preventDefault();
         const amount = parseInt(document.getElementById('pay-amount').value);
         safeAction(() => {
-            const currentMonth = new Date().toISOString().slice(0, 7);
-            socio.payments[currentMonth] = 'paid'; 
+            const monthsToPay = Math.floor(amount / 5000);
+            const cycleMonths = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "01", "02"];
+            const currentYear = new Date().getFullYear();
+            
+            let paidCount = 0;
+            for (const mKey of cycleMonths) {
+                if (paidCount >= monthsToPay) break;
+                const year = (parseInt(mKey) < 3) ? currentYear + 1 : currentYear; // Simplifiedrollover
+                const key = `${currentYear}-${mKey}`;
+                if (!socio.payments[key]) {
+                    socio.payments[key] = 'paid';
+                    paidCount++;
+                }
+            }
             document.getElementById('modal-root').innerHTML = '';
+            renderView('socios');
         });
     };
 };
@@ -973,36 +1036,103 @@ window.app.markFiadoPaid = (index) => {
 };
 
 window.app.exportPDF = () => {
-    const element = document.getElementById('balance-report');
-    if (!element) {
-        alert("Primero debe estar en la vista de Finanzas para exportar el balance.");
-        return;
-    }
+    const cycleMonths = [
+        { key: "03", name: "Marzo" }, { key: "04", name: "Abril" }, { key: "05", name: "Mayo" },
+        { key: "06", name: "Junio" }, { key: "07", name: "Julio" }, { key: "08", name: "Agosto" },
+        { key: "09", name: "Septiembre" }, { key: "10", name: "Octubre" }, { key: "11", name: "Noviembre" },
+        { key: "12", name: "Diciembre" }, { key: "01", name: "Enero" }, { key: "02", name: "Febrero" }
+    ];
     
-    const clone = element.cloneNode(true);
-    clone.style.background = "#FFFFFF";
-    clone.style.color = "#000000";
-    clone.style.padding = "40px";
-    clone.style.width = "800px";
-    
-    clone.querySelectorAll('.card, h2, h3, p, label, td, tr').forEach(el => {
-        el.style.color = "#000000";
-        el.style.background = "transparent";
-        el.style.borderColor = "#EEEEEE";
+    const currentYear = new Date().getFullYear();
+    const seasonData = cycleMonths.map(m => {
+        const year = (parseInt(m.key) < 3) ? currentYear + 1 : currentYear;
+        const monthKey = `${currentYear}-${m.key}`; // Simplified for current year logic
+        
+        const sales = state.inventory.sales.filter(s => s.date.startsWith(monthKey)).reduce((a, b) => a + b.total, 0);
+        const jerseys = state.finances.jerseys.filter(j => j.date.includes(m.name) || j.date.startsWith(monthKey)).reduce((a, b) => a + b.amount, 0);
+        const socioPayments = state.socios.reduce((acc, s) => {
+            return acc + (s.payments[monthKey] ? 5000 : 0);
+        }, 0);
+        
+        const purchases = state.inventory.purchases.filter(p => p.date.startsWith(monthKey)).reduce((a, b) => a + b.cost, 0);
+        const misc = state.finances.misc.filter(mx => mx.date.startsWith(monthKey)).reduce((a, b) => a + b.amount, 0);
+        
+        const totalIn = sales + jerseys + socioPayments;
+        const totalOut = purchases + misc;
+        
+        return { name: m.name, in: totalIn, out: totalOut, net: totalIn - totalOut };
     });
-    
-    const btn = clone.querySelector('button');
-    if (btn) btn.style.display = 'none';
+
+    const reportHtml = `
+        <div style="font-family: 'Inter', sans-serif; padding: 40px; color: #334155;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 30px;">
+                <div>
+                    <h1 style="margin: 0; color: #1e293b; font-size: 24px;">BALANCE GENERAL ANUAL</h1>
+                    <p style="margin: 5px 0 0 0; color: #64748b;">Ciclo Deportivo: Marzo a Febrero</p>
+                </div>
+                <div style="text-align: right;">
+                    <h2 style="margin: 0; color: #ef4444;">CLUB 19 DE JUNIO</h2>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #94a3b8;">Generado el ${new Date().toLocaleDateString()}</p>
+                </div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+                <thead>
+                    <tr style="background: #f8fafc;">
+                        <th style="padding: 12px; text-align: left; border: 1px solid #e2e8f0;">Mes</th>
+                        <th style="padding: 12px; text-align: right; border: 1px solid #e2e8f0;">Ingresos</th>
+                        <th style="padding: 12px; text-align: right; border: 1px solid #e2e8f0;">Egresos</th>
+                        <th style="padding: 12px; text-align: right; border: 1px solid #e2e8f0;">Balance Neto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${seasonData.map(d => `
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e2e8f0;">${d.name}</td>
+                            <td style="padding: 10px; text-align: right; border: 1px solid #e2e8f0; color: #10b981;">$${d.in.toLocaleString()}</td>
+                            <td style="padding: 10px; text-align: right; border: 1px solid #e2e8f0; color: #ef4444;">$${d.out.toLocaleString()}</td>
+                            <td style="padding: 10px; text-align: right; border: 1px solid #e2e8f0; font-weight: bold; color: ${d.net >= 0 ? '#0f172a' : '#ef4444'};">
+                                $${d.net.toLocaleString()}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f1f5f9; font-weight: bold;">
+                        <td style="padding: 15px; border: 1px solid #e2e8f0;">TOTAL TEMPORADA</td>
+                        <td style="padding: 15px; text-align: right; border: 1px solid #e2e8f0; color: #10b981;">
+                            $${seasonData.reduce((a, b) => a + b.in, 0).toLocaleString()}
+                        </td>
+                        <td style="padding: 15px; text-align: right; border: 1px solid #e2e8f0; color: #ef4444;">
+                            $${seasonData.reduce((a, b) => a + b.out, 0).toLocaleString()}
+                        </td>
+                        <td style="padding: 15px; text-align: right; border: 1px solid #e2e8f0; font-size: 18px;">
+                            $${seasonData.reduce((a, b) => a + b.net, 0).toLocaleString()}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div style="margin-top: 50px; border-top: 1px dashed #cbd5e1; padding-top: 20px;">
+                <p style="font-size: 10px; color: #94a3b8; text-align: center;">
+                    Este documento es un reporte interno del Club Social y Deportivo 19 de Junio. 
+                    Toda la información contenida es de carácter confidencial.
+                </p>
+            </div>
+        </div>
+    `;
 
     const opt = {
       margin:       0.5,
-      filename:     `Balance_Club_19_Junio_${new Date().toLocaleDateString()}.pdf`,
+      filename:     `Balance_Anual_${currentYear}_Club_19_Junio.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, backgroundColor: '#FFFFFF' },
       jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
     
-    html2pdf().set(opt).from(clone).save();
+    // Create a temporary element to render the HTML for html2pdf
+    const worker = html2pdf();
+    worker.set(opt).from(reportHtml).save();
 };
 
 function renderConfig(container) { 
