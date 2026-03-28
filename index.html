@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club 19 de Junio - Gestión Administrativa</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Charts & PDF Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app-shell">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <i class="fas fa-futbol"></i>
+                <span>19 de Junio</span>
+            </div>
+            <nav class="nav-links">
+                <a href="#dashboard" class="nav-link active" data-view="dashboard">
+                    <i class="fas fa-chart-line"></i> Dashboard
+                </a>
+                <a href="#partidos" class="nav-link" data-view="partidos">
+                    <i class="fas fa-trophy"></i> Partidos
+                </a>
+                <a href="#inventario" class="nav-link" data-view="inventario">
+                    <i class="fas fa-boxes-stacked"></i> Inventario
+                </a>
+                <a href="#ventas" class="nav-link" data-view="ventas">
+                    <i class="fas fa-cash-register"></i> Ventas
+                </a>
+                <a href="#socios" class="nav-link" data-view="socios">
+                    <i class="fas fa-users"></i> Socios
+                </a>
+                <a href="#finanzas" class="nav-link" data-view="finanzas">
+                    <i class="fas fa-file-invoice-dollar"></i> Finanzas
+                </a>
+                <a href="#config" class="nav-link" data-view="config">
+                    <i class="fas fa-cog"></i> Configuración
+                </a>
+            </nav>
+            <div style="margin-top: auto; padding: 1rem; border-top: 1px solid var(--border-clr);">
+                <button class="btn btn-outline" id="exportBtn" style="width: 100%;">
+                    <i class="fas fa-download"></i> Respaldar JSON
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content" id="app">
+            <!-- Content will be injected here by JS router -->
+            <div class="header">
+                <h1 id="view-title">Dashboard</h1>
+                <div class="header-actions">
+                    <span id="current-date" class="text-muted"></span>
+                </div>
+            </div>
+            
+            <div id="view-container">
+                <!-- Dashboard Skeleton -->
+                <div class="stat-grid">
+                    <div class="card">
+                        <label>Ventas Semanales</label>
+                        <h2 id="weekly-sales-stat">$0 CLP</h2>
+                    </div>
+                    <div class="card">
+                        <label>Socios al día</label>
+                        <h2 id="socios-active-stat">0 / 0</h2>
+                    </div>
+                    <div class="card">
+                        <label>Balance Mensual</label>
+                        <h2 id="monthly-balance-stat">$0 CLP</h2>
+                    </div>
+                </div>
+                
+                <div class="card" style="min-height: 400px;">
+                    <canvas id="mainChart"></canvas>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals (Initially Hidden) -->
+    <div id="modal-root"></div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
