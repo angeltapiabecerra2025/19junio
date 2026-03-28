@@ -93,140 +93,75 @@ function renderDashboard(container) {
     container.innerHTML = `
         <div class="stat-grid">
             <div class="card" style="border-top: 4px solid var(--primary-blue);">
-                <label><i class="fas fa-trophy"></i> Victorias</label>
-                <h2 id="wins-count">${calculateMatches('W')}</h2>
+                <label><i class="fas fa-trophy"></i> Ganados (G)</label>
+                <h2 id="wins-count">${calculateMatches('G')}</h2>
             </div>
             <div class="card" style="border-top: 4px solid var(--secondary-red);">
-                <label><i class="fas fa-times-circle"></i> Derrotas</label>
-                <h2 id="loss-count">${calculateMatches('L')}</h2>
+                <label><i class="fas fa-times-circle"></i> Perdidos (P)</label>
+                <h2 id="loss-count">${calculateMatches('P')}</h2>
+            </div>
+            <div class="card" style="border-top: 4px solid var(--warning);">
+                <label><i class="fas fa-handshake"></i> Empatados (E)</label>
+                <h2 id="draws-count">${calculateMatches('E')}</h2>
             </div>
             <div class="card" style="border-top: 4px solid var(--success);">
-                <label><i class="fas fa-cash-register"></i> Ventas Acum.</label>
+                <label><i class="fas fa-cash-register"></i> Ingresos Ventas</label>
                 <h2 id="weekly-sales-stat">$${totalSales.toLocaleString()}</h2>
             </div>
-            <div class="card" style="border-top: 4px solid #D4AF37;">
-                <label><i class="fas fa-users"></i> Socios al día</label>
-                <h2 id="socios-active-stat">${activeSocios} / ${state.socios.length}</h2>
+        </div>
+        
+        <div class="card" style="margin-top: 2rem; border-left: 4px solid var(--primary-blue);">
+            <h3>Resumen Administrativo</h3>
+            <p class="text-muted" style="margin-top: 0.5rem;">Bienvenido al panel de gestión del Club 19 de Junio. Utiliza el menú lateral para navegar por los módulos de partidos, inventario y finanzas.</p>
+            <div style="margin-top: 1.5rem; display: flex; gap: 2rem;">
+                <div>
+                    <label>Socios al día</label>
+                    <h3>${activeSocios} / ${state.socios.length}</h3>
+                </div>
+                <div>
+                    <label>Esgreso en Compras</label>
+                    <h3 style="color: var(--secondary-red);">$${state.inventory.purchases.reduce((a, b) => a + b.cost, 0).toLocaleString()}</h3>
+                </div>
             </div>
         </div>
-        <div class="card" style="min-height: 400px; margin-top: 2rem;">
-            <h3>Tendencia de Ventas vs Gastos</h3>
-            <canvas id="mainChart"></canvas>
-        </div>
     `;
-    
-    initDashboardChart();
 }
 
+// CRUD Helpers
+const safeAction = (callback) => {
+    if (confirm("¿Desea realizar el cambio?")) {
+        callback();
+        saveState(state);
+        renderView(app.currentView);
+    }
+};
+
+window.app.deleteMatch = (index) => safeAction(() => state.matches.splice(index, 1));
+window.app.deleteProduct = (index) => safeAction(() => state.inventory.products.splice(index, 1));
+window.app.deleteSale = (index) => safeAction(() => {
+    const sale = state.inventory.sales[index];
+    const product = state.inventory.products.find(p => p.id === sale.productId);
+    if (product) product.stock += sale.quantity; // Restore stock
+    state.inventory.sales.splice(index, 1);
+});
+window.app.deleteSocio = (id) => safeAction(() => {
+    state.socios = state.socios.filter(s => s.id !== id);
+});
+window.app.deleteFiado = (index) => safeAction(() => state.finances.fiados.splice(index, 1));
+window.app.deleteJersey = (index) => safeAction(() => state.finances.jerseys.splice(index, 1));
+window.app.deleteMisc = (index) => safeAction(() => state.finances.misc.splice(index, 1));
+window.app.deletePurchase = (index) => safeAction(() => {
+  const p = state.inventory.purchases[index];
+  const prod = state.inventory.products.find(pr => pr.id === p.productId);
+  if (prod) prod.stock -= p.quantity;
+  state.inventory.purchases.splice(index, 1);
+});
+
+// --- Placeholder Renders for remaining modules ---
 function calculateMatches(type) {
   return state.matches.filter(m => m.result === type).length;
 }
 
-function initDashboardChart() {
-    const ctx = document.getElementById('mainChart').getContext('2d');
-    
-    // 1. Logic for grouping data by Month (e.g., '2026-03')
-    const incomeByMonth = {};
-    const expenseByMonth = {};
-    
-    // Helper: Add to map
-    const add = (map, date, amt) => {
-        const m = date.substring(0, 7); // YYYY-MM
-        map[m] = (map[m] || 0) + amt;
-    };
-    
-    // Aggregating Income
-    state.inventory.sales.forEach(s => add(incomeByMonth, s.date, s.total));
-    state.socios.forEach(socio => {
-        Object.keys(socio.payments || {}).forEach(mStr => {
-            if (socio.payments[mStr] === 'paid') incomeByMonth[mStr] = (incomeByMonth[mStr] || 0) + 5000;
-        });
-    });
-    state.finances.jerseys.forEach(j => add(incomeByMonth, j.date, j.amount));
-    state.finances.fiados.filter(f => f.paid).forEach(f => {
-        // Since fiados don't have a pay-date yet (simplified), we use 'current' or index
-        const m = new Date().toISOString().substring(0, 7);
-        incomeByMonth[m] = (incomeByMonth[m] || 0) + f.total;
-    });
-
-    // Aggregating Expenses
-    state.inventory.purchases.forEach(p => add(expenseByMonth, p.date, p.cost));
-    state.finances.misc.forEach(m => add(expenseByMonth, m.date, m.amount));
-
-    // Labels: Month names for last 6 months or all months with data
-    const labels = [...new Set([...Object.keys(incomeByMonth), ...Object.keys(expenseByMonth)])].sort();
-    const incomeData = labels.map(l => incomeByMonth[l] || 0);
-    const expenseData = labels.map(l => expenseByMonth[l] || 0);
-
-    // If no data, show a placeholder label
-    const displayLabels = labels.length ? labels : ['Sin datos'];
-    const displayIncome = incomeData.length ? incomeData : [0];
-    const displayExpense = expenseData.length ? expenseData : [0];
-
-    // Gradient creation
-    const gradientInc = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientInc.addColorStop(0, 'rgba(0, 56, 168, 0.5)');
-    gradientInc.addColorStop(1, 'rgba(0, 56, 168, 0.0)');
-
-    const gradientExp = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientExp.addColorStop(0, 'rgba(238, 28, 37, 0.5)');
-    gradientExp.addColorStop(1, 'rgba(238, 28, 37, 0.0)');
-
-    app.chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: displayLabels,
-            datasets: [{
-                label: 'Ingresos Mensuales',
-                data: displayIncome,
-                borderColor: '#0038A8',
-                backgroundColor: gradientInc,
-                fill: true,
-                tension: 0.4,
-                pointBackgroundColor: '#0038A8',
-                borderWidth: 3
-            }, {
-                label: 'Egresos Mensales',
-                data: displayExpense,
-                borderColor: '#EE1C25',
-                backgroundColor: gradientExp,
-                fill: true,
-                tension: 0.4,
-                pointBackgroundColor: '#EE1C25',
-                borderWidth: 3
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { intersect: false, mode: 'index' },
-            plugins: {
-                legend: { position: 'top', labels: { color: '#F8FAFC', font: { weight: '600' } } },
-                tooltip: {
-                    backgroundColor: '#1E293B',
-                    titleColor: '#F8FAFC',
-                    bodyColor: '#94A3B8',
-                    borderColor: 'rgba(255,255,255,0.1)',
-                    borderWidth: 1,
-                    padding: 12
-                }
-            },
-            scales: {
-                y: { 
-                    beginAtZero: true, 
-                    grid: { color: 'rgba(255,255,255,0.05)' },
-                    ticks: { color: '#94A3B8', callback: (val) => '$' + val.toLocaleString() }
-                },
-                x: { 
-                    grid: { display: false },
-                    ticks: { color: '#94A3B8' }
-                }
-            }
-        }
-    });
-}
-
-// --- Placeholder Renders for remaining modules ---
 function renderPartidos(container) {
     container.innerHTML = `
         <div class="card">
@@ -252,7 +187,7 @@ function renderPartidos(container) {
             </form>
         </div>
         <div class="card" style="margin-top: 2rem;">
-            <h3>Historial</h3>
+            <h3>Historial de Partidos</h3>
             <div class="table-container">
                 <table id="match-table">
                     <thead>
@@ -261,15 +196,25 @@ function renderPartidos(container) {
                             <th>Oponente</th>
                             <th>Resultado</th>
                             <th>Score</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="match-list">
-                        ${state.matches.map(m => `
+                        ${state.matches.map((m, i) => `
                             <tr>
                                 <td>${m.date}</td>
                                 <td>${m.opponent}</td>
-                                <td><span class="badge ${m.result === 'W' ? 'badge-paid' : m.result === 'L' ? 'badge-danger' : 'badge-pending'}">${m.result}</span></td>
+                                <td>
+                                    <span class="badge ${m.result === 'G' ? 'badge-paid' : m.result === 'P' ? 'badge-danger' : 'badge-pending'}">
+                                        ${m.result === 'G' ? 'Ganado' : m.result === 'P' ? 'Perdido' : 'Empate'}
+                                    </span>
+                                </td>
                                 <td>${m.scoreHome} - ${m.scoreAway}</td>
+                                <td>
+                                    <button class="btn btn-outline btn-sm" onclick="app.deleteMatch(${i})" title="Eliminar">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -285,9 +230,9 @@ function handleAddMatch(e) {
     e.preventDefault();
     const home = parseInt(document.getElementById('match-score-home').value);
     const away = parseInt(document.getElementById('match-score-away').value);
-    let result = 'D';
-    if (home > away) result = 'W';
-    else if (home < away) result = 'L';
+    let result = 'E';
+    if (home > away) result = 'G';
+    else if (home < away) result = 'P';
     
     const newMatch = {
         date: document.getElementById('match-date').value,
@@ -297,16 +242,14 @@ function handleAddMatch(e) {
         result: result
     };
     
-    state.matches.push(newMatch);
-    saveState(state);
-    renderPartidos(document.getElementById('view-container'));
+    safeAction(() => state.matches.push(newMatch));
 }
 
 function renderInventario(container) { 
   container.innerHTML = `
     <div class="card">
-        <h3>Mantenedor de Stock y Precios</h3>
-        <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Actualiza el stock semanal y registra compras (gastos).</p>
+        <h3>Mantenedor de Productos</h3>
+        <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Administra tus productos base.</p>
         <div class="table-container">
             <table>
                 <thead>
@@ -314,18 +257,24 @@ function renderInventario(container) {
                         <th>Producto</th>
                         <th>Precio Venta</th>
                         <th>Stock Actual</th>
-                        <th>Acción</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${state.inventory.products.map(p => `
+                    ${state.inventory.products.map((p, i) => `
                         <tr>
                             <td>${p.name}</td>
                             <td>$${p.price.toLocaleString()}</td>
                             <td id="stock-${p.id}">${p.stock}</td>
                             <td>
-                                <button class="btn btn-outline btn-sm" onclick="app.showAddStock('${p.id}')">
-                                    <i class="fas fa-plus"></i> Compra/Stock
+                                <button class="btn btn-primary btn-sm" onclick="app.showAddStock('${p.id}')">
+                                    <i class="fas fa-plus"></i> Stock
+                                </button>
+                                <button class="btn btn-outline btn-sm" onclick="app.showEditProduct(${i})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline btn-sm" onclick="app.deleteProduct(${i})">
+                                    <i class="fas fa-trash"></i>
                                 </button>
                             </td>
                         </tr>
@@ -334,9 +283,64 @@ function renderInventario(container) {
             </table>
         </div>
     </div>
-    <div id="stock-modal-container"></div>
+
+    <div class="card" style="margin-top: 2rem;">
+        <h3>Historial de Compras (Egresos)</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Costo</th><th>Acción</th></tr>
+                </thead>
+                <tbody>
+                    ${state.inventory.purchases.map((p, i) => `
+                        <tr>
+                            <td>${p.date}</td>
+                            <td>${p.productName}</td>
+                            <td>${p.quantity}</td>
+                            <td>$${p.cost.toLocaleString()}</td>
+                            <td>
+                                <button class="btn btn-outline btn-sm" onclick="app.deletePurchase(${i})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    </div>
   `;
 }
+
+window.app.showEditProduct = (index) => {
+    const product = state.inventory.products[index];
+    const modalRoot = document.getElementById('modal-root');
+    modalRoot.innerHTML = `
+        <div class="modal-overlay">
+            <div class="modal">
+                <h3>Editar Producto: ${product.name}</h3>
+                <form id="edit-prod-form">
+                    <div class="form-group"><label>Nombre</label><input type="text" id="ep-name" value="${product.name}" required></div>
+                    <div class="form-group"><label>Precio Venta</label><input type="number" id="ep-price" value="${product.price}" required></div>
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-root').innerHTML = ''">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    document.getElementById('edit-prod-form').onsubmit = (e) => {
+        e.preventDefault();
+        const name = document.getElementById('ep-name').value;
+        const price = parseInt(document.getElementById('ep-price').value);
+        safeAction(() => {
+            product.name = name;
+            product.price = price;
+            document.getElementById('modal-root').innerHTML = '';
+        });
+    };
+};
 
 // Global functions for stock actions
 window.app = window.app || {};
@@ -440,17 +444,22 @@ function renderVentas(container) {
         <div class="table-container">
             <table>
                 <thead>
-                    <tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Total</th></tr>
+                    <tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Total</th><th>Acción</th></tr>
                 </thead>
                 <tbody id="sales-list">
-                    ${state.inventory.sales.slice(-5).reverse().map(s => `
+                    ${state.inventory.sales.map((s, i) => `
                         <tr>
                             <td>${s.date}</td>
                             <td>${s.productName}</td>
                             <td>${s.quantity}</td>
                             <td>$${s.total.toLocaleString()}</td>
+                            <td>
+                                <button class="btn btn-outline btn-sm" onclick="app.deleteSale(${i})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
                         </tr>
-                    `).join('')}
+                    `).reverse().slice(0, 10).join('')}
                 </tbody>
             </table>
         </div>
@@ -470,19 +479,18 @@ function renderVentas(container) {
       }
       
       const total = product.price * qty;
-      product.stock -= qty;
       
-      state.inventory.sales.push({
-          date: new Date().toISOString().split('T')[0],
-          productId: pId,
-          productName: product.name,
-          quantity: qty,
-          price: product.price,
-          total: total
+      safeAction(() => {
+          product.stock -= qty;
+          state.inventory.sales.push({
+              date: new Date().toISOString().split('T')[0],
+              productId: pId,
+              productName: product.name,
+              quantity: qty,
+              price: product.price,
+              total: total
+          });
       });
-      
-      saveState(state);
-      renderVentas(container);
   };
 
   // Calculator Logic
@@ -519,7 +527,7 @@ function renderSocios(container) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${state.socios.map(s => {
+                    ${state.socios.map((s, i) => {
                         const debt = calculateSocioDebt(s);
                         return `
                         <tr>
@@ -527,8 +535,14 @@ function renderSocios(container) {
                             <td><span class="badge ${debt === 0 ? 'badge-paid' : 'badge-danger'}">${debt === 0 ? 'Al día' : 'Pendiente'}</span></td>
                             <td>$${debt.toLocaleString()}</td>
                             <td>
-                                <button class="btn btn-outline btn-sm" onclick="app.showPaySocio('${s.id}')">
+                                <button class="btn btn-primary btn-sm" onclick="app.showPaySocio('${s.id}')">
                                     <i class="fas fa-dollar-sign"></i> Pagar
+                                </button>
+                                <button class="btn btn-outline btn-sm" onclick="app.showEditSocio('${s.id}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline btn-sm" onclick="app.deleteSocio('${s.id}')">
+                                    <i class="fas fa-trash"></i>
                                 </button>
                             </td>
                         </tr>`;
@@ -540,13 +554,35 @@ function renderSocios(container) {
   `;
 }
 
-function calculateSocioDebt(socio) {
-    const monthsActive = 1; // Simplification for demo: assume 1 month for now or calculate from joinDate
-    // Real logic would count months between joinDate and now
-    const paid = Object.values(socio.payments || {}).filter(v => v === 'paid').length;
-    const unpaidMonths = monthsActive - paid;
-    return Math.max(0, unpaidMonths * 5000);
-}
+window.app.showEditSocio = (id) => {
+    const socio = state.socios.find(s => s.id === id);
+    const modalRoot = document.getElementById('modal-root');
+    modalRoot.innerHTML = `
+        <div class="modal-overlay">
+            <div class="modal">
+                <h3>Editar Socio</h3>
+                <form id="edit-socio-form">
+                    <div class="form-group">
+                        <label>Nombre Completo</label>
+                        <input type="text" id="es-name" value="${socio.name}" required>
+                    </div>
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-root').innerHTML = ''">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    document.getElementById('edit-socio-form').onsubmit = (e) => {
+        e.preventDefault();
+        const newName = document.getElementById('es-name').value;
+        safeAction(() => {
+            socio.name = newName;
+            document.getElementById('modal-root').innerHTML = '';
+        });
+    };
+};
 
 window.app.showAddSocio = () => {
     const modalRoot = document.getElementById('modal-root');
@@ -569,15 +605,16 @@ window.app.showAddSocio = () => {
     `;
     document.getElementById('socio-form').onsubmit = (e) => {
         e.preventDefault();
-        state.socios.push({
-            id: 's' + Date.now(),
-            name: document.getElementById('socio-name').value,
-            joinDate: new Date().toISOString().split('T')[0],
-            payments: {}
+        const name = document.getElementById('socio-name').value;
+        safeAction(() => {
+            state.socios.push({
+                id: 's' + Date.now(),
+                name: name,
+                joinDate: new Date().toISOString().split('T')[0],
+                payments: {}
+            });
+            document.getElementById('modal-root').innerHTML = '';
         });
-        saveState(state);
-        document.getElementById('modal-root').innerHTML = '';
-        renderSocios(document.getElementById('view-container'));
     };
 };
 
@@ -605,17 +642,11 @@ window.app.showPaySocio = (id) => {
     document.getElementById('pay-form').onsubmit = (e) => {
         e.preventDefault();
         const amount = parseInt(document.getElementById('pay-amount').value);
-        const monthsPaid = Math.floor(amount / 5000);
-        
-        // Log individual payments to history...
-        // For now, mark months as paid (simplification)
-        const currentMonth = new Date().toISOString().slice(0, 7);
-        socio.payments[currentMonth] = 'paid'; 
-        // Logic for multiple months omitted for brevity in this step but plan covers it
-        
-        saveState(state);
-        document.getElementById('modal-root').innerHTML = '';
-        renderSocios(document.getElementById('view-container'));
+        safeAction(() => {
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            socio.payments[currentMonth] = 'paid'; 
+            document.getElementById('modal-root').innerHTML = '';
+        });
     };
 };
 
@@ -626,11 +657,11 @@ function renderFinanzas(container) {
   container.innerHTML = `
     <div class="stat-grid">
         <div class="card" style="border-bottom: 4px solid var(--success);">
-            <label>Ingresos Totales</label>
+            <label>Ingresos Totales (Ventas)</label>
             <h2>$${totalIn.toLocaleString()}</h2>
         </div>
         <div class="card" style="border-bottom: 4px solid var(--secondary-red);">
-            <label>Egresos Totales</label>
+            <label>Egresos Totales (Compras)</label>
             <h2>$${totalOut.toLocaleString()}</h2>
         </div>
         <div class="card" style="border-bottom: 4px solid var(--primary-blue);">
@@ -641,7 +672,7 @@ function renderFinanzas(container) {
     
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
         <div class="card">
-            <h3>Ingreso Camisetas</h3>
+            <h3>Ingreso por Camisetas</h3>
             <form id="jersey-form" style="margin-top: 1rem;">
                 <div class="form-group">
                     <label>Monto Recaudado</label>
@@ -649,10 +680,23 @@ function renderFinanzas(container) {
                 </div>
                 <button type="submit" class="btn btn-outline" style="width: 100%;">Registrar</button>
             </form>
+            <div class="table-container" style="margin-top: 1rem;">
+                <table>
+                    <tbody>
+                        ${state.finances.jerseys.map((j, i) => `
+                            <tr>
+                                <td>${j.date}</td>
+                                <td>$${j.amount.toLocaleString()}</td>
+                                <td><button class="btn btn-outline btn-sm" onclick="app.deleteJersey(${i})"><i class="fas fa-trash"></i></button></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
         </div>
         
         <div class="card">
-            <h3>Otros Gastos (Arriendos, etc)</h3>
+            <h3>Otros Gastos (Arriendos, Arbitraje, etc)</h3>
             <form id="misc-form" style="margin-top: 1rem;">
                 <div class="form-group">
                     <label>Descripción</label>
@@ -664,6 +708,19 @@ function renderFinanzas(container) {
                 </div>
                 <button type="submit" class="btn btn-secondary" style="width: 100%;">Registrar Gasto</button>
             </form>
+            <div class="table-container" style="margin-top: 1rem;">
+                <table>
+                    <tbody>
+                        ${state.finances.misc.map((m, i) => `
+                            <tr>
+                                <td>${m.desc}</td>
+                                <td>$${m.amount.toLocaleString()}</td>
+                                <td><button class="btn btn-outline btn-sm" onclick="app.deleteMisc(${i})"><i class="fas fa-trash"></i></button></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
     
@@ -673,7 +730,7 @@ function renderFinanzas(container) {
         <div class="table-container">
             <table>
                 <thead>
-                    <tr><th>Nombre</th><th>Producto</th><th>Total</th><th>Estado</th></tr>
+                    <tr><th>Nombre</th><th>Producto</th><th>Total</th><th>Estado</th><th>Acción</th></tr>
                 </thead>
                 <tbody>
                     ${state.finances.fiados.map((f, i) => `
@@ -685,10 +742,13 @@ function renderFinanzas(container) {
                                 <input type="checkbox" ${f.paid ? 'checked disabled' : ''} onchange="app.markFiadoPaid(${i})">
                                 ${f.paid ? '<span class="badge badge-paid">Pagado</span>' : '<span class="badge badge-danger">Pendiente</span>'}
                             </td>
+                            <td>
+                                <button class="btn btn-outline btn-sm" onclick="app.deleteFiado(${i})"><i class="fas fa-trash"></i></button>
+                            </td>
                         </tr>
                     `).join('')}
                     <tr>
-                        <td colspan="4">
+                        <td colspan="5">
                             <button class="btn btn-outline btn-sm" onclick="app.showAddFiado()">
                                 <i class="fas fa-plus"></i> Agregar Fiado
                             </button>
@@ -706,22 +766,22 @@ function renderFinanzas(container) {
     </div>
   `;
   
-  // Handlers for jersey and misc
+  // Handlers
   document.getElementById('jersey-form').onsubmit = (e) => {
       e.preventDefault();
       const amount = parseInt(document.getElementById('jersey-amount').value);
-      state.finances.jerseys.push({ date: new Date().toISOString().split('T')[0], amount });
-      saveState(state);
-      renderFinanzas(container);
+      safeAction(() => {
+          state.finances.jerseys.push({ date: new Date().toISOString().split('T')[0], amount });
+      });
   };
   
   document.getElementById('misc-form').onsubmit = (e) => {
       e.preventDefault();
       const desc = document.getElementById('misc-desc').value;
       const amount = parseInt(document.getElementById('misc-amount').value);
-      state.finances.misc.push({ date: new Date().toISOString().split('T')[0], desc, amount });
-      saveState(state);
-      renderFinanzas(container);
+      safeAction(() => {
+          state.finances.misc.push({ date: new Date().toISOString().split('T')[0], desc, amount });
+      });
   };
 }
 
@@ -754,23 +814,23 @@ window.app.showAddFiado = () => {
         const qty = parseInt(document.getElementById('f-qty').value);
         const product = state.inventory.products.find(p => p.id === pId);
         
-        state.finances.fiados.push({
-            name: document.getElementById('f-name').value,
-            product: product.name,
-            quantity: qty,
-            total: product.price * qty,
-            paid: false
+        safeAction(() => {
+            state.finances.fiados.push({
+                name: document.getElementById('f-name').value,
+                product: product.name,
+                quantity: qty,
+                total: product.price * qty,
+                paid: false
+            });
+            document.getElementById('modal-root').innerHTML = '';
         });
-        saveState(state);
-        document.getElementById('modal-root').innerHTML = '';
-        renderFinanzas(document.getElementById('view-container'));
     };
 };
 
 window.app.markFiadoPaid = (index) => {
-    state.finances.fiados[index].paid = true;
-    saveState(state);
-    renderFinanzas(document.getElementById('view-container'));
+    safeAction(() => {
+        state.finances.fiados[index].paid = true;
+    });
 };
 
 window.app.exportPDF = () => {
