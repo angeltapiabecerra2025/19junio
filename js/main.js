@@ -69,12 +69,20 @@ function renderView(viewId) {
             title.innerText = 'Módulo de Ventas';
             renderVentas(container);
             break;
-        case 'socios':
-            title.innerText = 'Socios y Cuotas';
-            renderSocios(container);
+        case 'camisetas':
+            title.innerText = 'Ingresos por Camisetas';
+            renderCamisetas(container);
+            break;
+        case 'fiados':
+            title.innerText = 'Control de Fiados';
+            renderFiados(container);
+            break;
+        case 'gastos':
+            title.innerText = 'Egresos y Gastos Varios';
+            renderGastosVarios(container);
             break;
         case 'finanzas':
-            title.innerText = 'Balance y Finanzas';
+            title.innerText = 'Balance General del Mes';
             renderFinanzas(container);
             break;
         case 'config':
@@ -583,6 +591,7 @@ function renderSocios(container) {
                     </tr>
                 </thead>
                 <tbody>
+                    ${state.socios.length === 0 ? '<tr><td colspan="4" style="text-align:center;">No hay socios registrados.</td></tr>' : ''}
                     ${state.socios.map((s, i) => {
                         const debt = calculateSocioDebt(s);
                         return `
@@ -706,87 +715,109 @@ window.app.showPaySocio = (id) => {
     };
 };
 
-function renderFinanzas(container) { 
-  const totalIn = state.inventory.sales.reduce((acc, s) => acc + s.total, 0);
-  const totalOut = state.inventory.purchases.reduce((acc, p) => acc + p.cost, 0);
-
+function renderCamisetas(container) {
   container.innerHTML = `
-    <div class="stat-grid">
-        <div class="card" style="border-bottom: 4px solid var(--success);">
-            <label>Ingresos Totales (Ventas)</label>
-            <h2>$${totalIn.toLocaleString()}</h2>
-        </div>
-        <div class="card" style="border-bottom: 4px solid var(--secondary-red);">
-            <label>Egresos Totales (Compras)</label>
-            <h2>$${totalOut.toLocaleString()}</h2>
-        </div>
-        <div class="card" style="border-bottom: 4px solid var(--primary-blue);">
-            <label>Balance Neto</label>
-            <h2>$${(totalIn - totalOut).toLocaleString()}</h2>
-        </div>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
-        <div class="card">
-            <h3>Ingreso por Camisetas</h3>
-            <form id="jersey-form" style="margin-top: 1rem;">
-                <div class="form-group">
-                    <label>Monto Recaudado</label>
-                    <input type="number" id="jersey-amount" required>
-                </div>
-                <button type="submit" class="btn btn-outline" style="width: 100%;">Registrar</button>
-            </form>
-            <div class="table-container" style="margin-top: 1rem;">
-                <table>
-                    <tbody>
-                        ${state.finances.jerseys.map((j, i) => `
-                            <tr>
-                                <td>${j.date}</td>
-                                <td>$${j.amount.toLocaleString()}</td>
-                                <td><button class="btn btn-outline btn-sm" onclick="app.deleteJersey(${i})"><i class="fas fa-trash"></i></button></td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+    <div class="card">
+        <h3>Ingreso por Venta de Camisetas</h3>
+        <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Registra el dinero recaudado por la venta o arriendo de indumentaria.</p>
+        <form id="jersey-form" style="display: flex; gap: 1rem; align-items: flex-end;">
+            <div class="form-group" style="flex: 1;">
+                <label>Monto Recaudado (CLP)</label>
+                <input type="number" id="jersey-amount" required>
             </div>
-        </div>
-        
-        <div class="card">
-            <h3>Otros Gastos (Arriendos, Arbitraje, etc)</h3>
-            <form id="misc-form" style="margin-top: 1rem;">
-                <div class="form-group">
-                    <label>Descripción</label>
-                    <input type="text" id="misc-desc" placeholder="Ej: Arriendo cancha" required>
-                </div>
-                <div class="form-group">
-                    <label>Monto</label>
-                    <input type="number" id="misc-amount" required>
-                </div>
-                <button type="submit" class="btn btn-secondary" style="width: 100%;">Registrar Gasto</button>
-            </form>
-            <div class="table-container" style="margin-top: 1rem;">
-                <table>
-                    <tbody>
-                        ${state.finances.misc.map((m, i) => `
-                            <tr>
-                                <td>${m.desc}</td>
-                                <td>$${m.amount.toLocaleString()}</td>
-                                <td><button class="btn btn-outline btn-sm" onclick="app.deleteMisc(${i})"><i class="fas fa-trash"></i></button></td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+            <button type="submit" class="btn btn-primary" style="height: 45px;">Registrar Ingreso</button>
+        </form>
     </div>
-    
+
     <div class="card" style="margin-top: 2rem;">
-        <h3>Registro de Fiados (Pendientes de Pago)</h3>
-        <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Productos entregados no pagados. Al marcar como pagado, se suma al ingreso.</p>
+        <h3>Historial de Camisetas</h3>
         <div class="table-container">
             <table>
                 <thead>
-                    <tr><th>Nombre</th><th>Producto</th><th>Total</th><th>Estado</th><th>Acción</th></tr>
+                    <tr><th>Fecha</th><th>Monto</th><th>Acción</th></tr>
+                </thead>
+                <tbody>
+                    ${state.finances.jerseys.map((j, i) => `
+                        <tr>
+                            <td>${j.date}</td>
+                            <td>$${j.amount.toLocaleString()}</td>
+                            <td><button class="btn btn-outline btn-sm" onclick="app.deleteJersey(${i})"><i class="fas fa-trash"></i></button></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    </div>
+  `;
+
+  document.getElementById('jersey-form').onsubmit = (e) => {
+      e.preventDefault();
+      const amount = parseInt(document.getElementById('jersey-amount').value);
+      safeAction(() => {
+          state.finances.jerseys.push({ date: new Date().toLocaleDateString(), amount });
+      });
+  };
+}
+
+function renderGastosVarios(container) {
+  container.innerHTML = `
+    <div class="card">
+        <h3>Egresos y Gastos Varios</h3>
+        <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Registra pagos de arriendos, arbitraje, limpieza, etc.</p>
+        <form id="misc-form" style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 1rem; align-items: flex-end;">
+            <div class="form-group">
+                <label>Descripción del Gasto</label>
+                <input type="text" id="misc-desc" placeholder="Ej: Pago de Árbitros" required>
+            </div>
+            <div class="form-group">
+                <label>Monto (CLP)</label>
+                <input type="number" id="misc-amount" required>
+            </div>
+            <button type="submit" class="btn btn-secondary" style="height: 45px;">Registrar Egreso</button>
+        </form>
+    </div>
+
+    <div class="card" style="margin-top: 2rem;">
+        <h3>Historial de Gastos</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Acción</th></tr>
+                </thead>
+                <tbody>
+                    ${state.finances.misc.map((m, i) => `
+                        <tr>
+                            <td>${m.date}</td>
+                            <td>${m.desc}</td>
+                            <td>$${m.amount.toLocaleString()}</td>
+                            <td><button class="btn btn-outline btn-sm" onclick="app.deleteMisc(${i})"><i class="fas fa-trash"></i></button></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    </div>
+  `;
+
+  document.getElementById('misc-form').onsubmit = (e) => {
+      e.preventDefault();
+      const desc = document.getElementById('misc-desc').value;
+      const amount = parseInt(document.getElementById('misc-amount').value);
+      safeAction(() => {
+          state.finances.misc.push({ date: new Date().toLocaleDateString(), desc, amount });
+      });
+  };
+}
+
+function renderFiados(container) {
+  container.innerHTML = `
+    <div class="card">
+        <h3>Control de Fiados y Créditos</h3>
+        <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Administra las deudas pendientes de cobro.</p>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Nombre Deudor</th><th>Producto</th><th>Total</th><th>Estado</th><th>Acción</th></tr>
                 </thead>
                 <tbody>
                     ${state.finances.fiados.map((f, i) => `
@@ -795,50 +826,102 @@ function renderFinanzas(container) {
                             <td>${f.product} (${f.quantity})</td>
                             <td>$${f.total.toLocaleString()}</td>
                             <td>
-                                <input type="checkbox" ${f.paid ? 'checked disabled' : ''} onchange="app.markFiadoPaid(${i})">
                                 ${f.paid ? '<span class="badge badge-paid">Pagado</span>' : '<span class="badge badge-danger">Pendiente</span>'}
                             </td>
                             <td>
+                                ${!f.paid ? `<button class="btn btn-primary btn-sm" onclick="app.markFiadoPaid(${i})">Marcar Pagado</button>` : ''}
                                 <button class="btn btn-outline btn-sm" onclick="app.deleteFiado(${i})"><i class="fas fa-trash"></i></button>
                             </td>
                         </tr>
                     `).join('')}
-                    <tr>
-                        <td colspan="5">
-                            <button class="btn btn-outline btn-sm" onclick="app.showAddFiado()">
-                                <i class="fas fa-plus"></i> Agregar Fiado
-                            </button>
-                        </td>
-                    </tr>
                 </tbody>
             </table>
         </div>
-    </div>
-
-    <div class="card" style="margin-top: 2rem; text-align: center;">
-        <button class="btn btn-primary" onclick="app.exportPDF()">
-            <i class="fas fa-file-pdf"></i> Exportar Balance del Mes (PDF)
+        <button class="btn btn-outline" style="margin-top: 1rem;" onclick="app.showAddFiado()">
+            <i class="fas fa-plus"></i> Agregar Nuevo Fiado
         </button>
     </div>
   `;
+}
+
+function renderFinanzas(container) { 
+  const totalSales = state.inventory.sales.reduce((acc, s) => acc + s.total, 0);
+  const totalJerseys = state.finances.jerseys.reduce((acc, j) => acc + j.amount, 0);
+  const totalSocioPayments = state.socios.reduce((acc, s) => {
+      return acc + (Object.keys(s.payments).filter(m => s.payments[m] === 'paid').length * (state.settings.monthlyFee || 5000));
+  }, 0);
+  const totalFiadosPaid = state.finances.fiados.filter(f => f.paid).reduce((acc, f) => acc + f.total, 0);
   
-  // Handlers
-  document.getElementById('jersey-form').onsubmit = (e) => {
-      e.preventDefault();
-      const amount = parseInt(document.getElementById('jersey-amount').value);
-      safeAction(() => {
-          state.finances.jerseys.push({ date: new Date().toISOString().split('T')[0], amount });
-      });
-  };
+  const totalIn = totalSales + totalJerseys + totalSocioPayments + totalFiadosPaid;
+  const totalPurchases = state.inventory.purchases.reduce((acc, p) => acc + p.cost, 0);
+  const totalMiscExpenses = state.finances.misc.reduce((acc, m) => acc + m.amount, 0);
   
-  document.getElementById('misc-form').onsubmit = (e) => {
-      e.preventDefault();
-      const desc = document.getElementById('misc-desc').value;
-      const amount = parseInt(document.getElementById('misc-amount').value);
-      safeAction(() => {
-          state.finances.misc.push({ date: new Date().toISOString().split('T')[0], desc, amount });
-      });
-  };
+  const totalOut = totalPurchases + totalMiscExpenses;
+
+  container.innerHTML = `
+    <div id="balance-report">
+        <div class="card" style="border-left: 5px solid var(--primary-blue); margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h2>Balance General</h2>
+                    <p class="text-muted">Estado financiero consolidado al ${new Date().toLocaleDateString()}</p>
+                </div>
+                <img src="img/logo.png" style="width: 60px;">
+            </div>
+        </div>
+
+        <div class="stat-grid">
+            <div class="card" style="border-bottom: 4px solid var(--success);">
+                <label>Ingresos Totales (Recaudado)</label>
+                <h2 style="color: var(--success);">$${totalIn.toLocaleString()}</h2>
+            </div>
+            <div class="card" style="border-bottom: 4px solid var(--secondary-red);">
+                <label>Egresos Totales (Gastos)</label>
+                <h2 style="color: var(--secondary-red);">$${totalOut.toLocaleString()}</h2>
+            </div>
+            <div class="card" style="border-bottom: 4px solid var(--primary-blue);">
+                <label>Resultado Neto</label>
+                <h2>$${(totalIn - totalOut).toLocaleString()}</h2>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+            <div class="card">
+                <h3>Detalle de Ingresos</h3>
+                <div class="table-container">
+                    <table>
+                        <tr><td>Ventas Inventario</td><td style="text-align:right;">+ $${totalSales.toLocaleString()}</td></tr>
+                        <tr><td>Cuotas de Socios</td><td style="text-align:right;">+ $${totalSocioPayments.toLocaleString()}</td></tr>
+                        <tr><td>Venta de Camisetas</td><td style="text-align:right;">+ $${totalJerseys.toLocaleString()}</td></tr>
+                        <tr><td>Fiados Recuperados</td><td style="text-align:right;">+ $${totalFiadosPaid.toLocaleString()}</td></tr>
+                        <tr style="font-weight:bold; border-top: 2px solid var(--border-clr);">
+                            <td>TOTAL INGRESOS</td><td style="text-align:right;">$${totalIn.toLocaleString()}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Detalle de Egresos</h3>
+                <div class="table-container">
+                    <table>
+                        <tr><td>Compras de Stock</td><td style="text-align:right;">- $${totalPurchases.toLocaleString()}</td></tr>
+                        <tr><td>Gastos Varios</td><td style="text-align:right;">- $${totalMiscExpenses.toLocaleString()}</td></tr>
+                        <tr style="font-weight:bold; border-top: 2px solid var(--border-clr);">
+                            <td>TOTAL EGRESOS</td><td style="text-align:right;">$${totalOut.toLocaleString()}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem; text-align: center;">
+            <button class="btn btn-primary" onclick="app.exportPDF()">
+                <i class="fas fa-file-pdf"></i> Descargar Balance Professional (PDF)
+            </button>
+        </div>
+    </div>
+  `;
 }
 
 window.app.showAddFiado = () => {
@@ -890,15 +973,36 @@ window.app.markFiadoPaid = (index) => {
 };
 
 window.app.exportPDF = () => {
-    const element = document.getElementById('view-container');
+    const element = document.getElementById('balance-report');
+    if (!element) {
+        alert("Primero debe estar en la vista de Finanzas para exportar el balance.");
+        return;
+    }
+    
+    const clone = element.cloneNode(true);
+    clone.style.background = "#FFFFFF";
+    clone.style.color = "#000000";
+    clone.style.padding = "40px";
+    clone.style.width = "800px";
+    
+    clone.querySelectorAll('.card, h2, h3, p, label, td, tr').forEach(el => {
+        el.style.color = "#000000";
+        el.style.background = "transparent";
+        el.style.borderColor = "#EEEEEE";
+    });
+    
+    const btn = clone.querySelector('button');
+    if (btn) btn.style.display = 'none';
+
     const opt = {
-      margin:       1,
-      filename:     'Balance_Club_19_Junio.pdf',
+      margin:       0.5,
+      filename:     `Balance_Club_19_Junio_${new Date().toLocaleDateString()}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, backgroundColor: '#020617' },
+      html2canvas:  { scale: 2, backgroundColor: '#FFFFFF' },
       jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
-    html2pdf().set(opt).from(element).save();
+    
+    html2pdf().set(opt).from(clone).save();
 };
 
 function renderConfig(container) { 
