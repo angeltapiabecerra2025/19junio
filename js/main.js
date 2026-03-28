@@ -128,34 +128,44 @@ function renderDashboard(container) {
 }
 
 // CRUD Helpers
-const safeAction = (callback) => {
+const safeAction = (callback, auditMeta = null) => {
     if (confirm("¿Desea realizar el cambio?")) {
+        if (auditMeta) {
+            state.auditLog.push({
+                timestamp: new Date().toLocaleString(),
+                module: auditMeta.module,
+                itemData: JSON.stringify(auditMeta.item)
+            });
+        }
         callback();
         saveState(state);
         renderView(app.currentView);
     }
 };
 
-window.app.deleteMatch = (index) => safeAction(() => state.matches.splice(index, 1));
-window.app.deleteProduct = (index) => safeAction(() => state.inventory.products.splice(index, 1));
+window.app.deleteMatch = (index) => safeAction(() => state.matches.splice(index, 1), { module: 'Partidos', item: state.matches[index] });
+window.app.deleteProduct = (index) => safeAction(() => state.inventory.products.splice(index, 1), { module: 'Productos', item: state.inventory.products[index] });
 window.app.deleteSale = (index) => safeAction(() => {
     const sale = state.inventory.sales[index];
     const product = state.inventory.products.find(p => p.id === sale.productId);
     if (product) product.stock += sale.quantity; // Restore stock
     state.inventory.sales.splice(index, 1);
-});
-window.app.deleteSocio = (id) => safeAction(() => {
-    state.socios = state.socios.filter(s => s.id !== id);
-});
-window.app.deleteFiado = (index) => safeAction(() => state.finances.fiados.splice(index, 1));
-window.app.deleteJersey = (index) => safeAction(() => state.finances.jerseys.splice(index, 1));
-window.app.deleteMisc = (index) => safeAction(() => state.finances.misc.splice(index, 1));
+}, { module: 'Ventas', item: state.inventory.sales[index] });
+window.app.deleteSocio = (id) => {
+    const s = state.socios.find(soc => soc.id === id);
+    safeAction(() => {
+        state.socios = state.socios.filter(soc => soc.id !== id);
+    }, { module: 'Socios', item: s });
+};
+window.app.deleteFiado = (index) => safeAction(() => state.finances.fiados.splice(index, 1), { module: 'Fiados', item: state.finances.fiados[index] });
+window.app.deleteJersey = (index) => safeAction(() => state.finances.jerseys.splice(index, 1), { module: 'Camisetas', item: state.finances.jerseys[index] });
+window.app.deleteMisc = (index) => safeAction(() => state.finances.misc.splice(index, 1), { module: 'GastosVarios', item: state.finances.misc[index] });
 window.app.deletePurchase = (index) => safeAction(() => {
   const p = state.inventory.purchases[index];
   const prod = state.inventory.products.find(pr => pr.id === p.productId);
   if (prod) prod.stock -= p.quantity;
   state.inventory.purchases.splice(index, 1);
-});
+}, { module: 'Compras', item: state.inventory.purchases[index] });
 
 // --- Placeholder Renders for remaining modules ---
 function calculateMatches(type) {
@@ -235,7 +245,7 @@ function handleAddMatch(e) {
     else if (home < away) result = 'P';
     
     const newMatch = {
-        date: document.getElementById('match-date').value,
+        date: new Date().toLocaleString(),
         opponent: document.getElementById('match-opponent').value,
         scoreHome: home,
         scoreAway: away,
@@ -385,7 +395,7 @@ window.app.showAddStock = (productId) => {
         
         // Log Purchase as Expense
         state.inventory.purchases.push({
-            date: new Date().toISOString().split('T')[0],
+            date: new Date().toLocaleString(),
             productId: product.id,
             productName: product.name,
             quantity: qty,
@@ -482,8 +492,11 @@ function renderVentas(container) {
       
       safeAction(() => {
           product.stock -= qty;
+          const totalCompraInput = document.getElementById('calc-total');
+          if (totalCompraInput) totalCompraInput.value = total;
+          
           state.inventory.sales.push({
-              date: new Date().toISOString().split('T')[0],
+              date: new Date().toLocaleString(),
               productId: pId,
               productName: product.name,
               quantity: qty,
@@ -858,6 +871,33 @@ function renderConfig(container) {
                     <i class="fas fa-file-import"></i> Importar Datos
                     <input type="file" id="import-file" style="position: absolute; opacity: 0; left: 0; top: 0; cursor: pointer;">
                 </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem;">
+            <h3><i class="fas fa-shield-halved"></i> Historial de Auditoría (Eliminaciones)</h3>
+            <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Registro permanente de elementos borrados para seguridad administrativa.</p>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha/Hora</th>
+                            <th>Módulo</th>
+                            <th>Datos Eliminados</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${state.auditLog.map(log => `
+                            <tr>
+                                <td style="white-space: nowrap;">${log.timestamp}</td>
+                                <td><span class="badge badge-danger">${log.module}</span></td>
+                                <td style="font-size: 0.75rem; color: var(--text-muted); max-width: 400px; overflow: hidden; text-overflow: ellipsis;">
+                                    ${log.itemData}
+                                </td>
+                            </tr>
+                        `).reverse().join('')}
+                    </tbody>
+                </table>
             </div>
         </div>
     `;

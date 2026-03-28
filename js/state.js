@@ -23,7 +23,8 @@ const INITIAL_STATE = {
   settings: {
     theme: 'dark',
     monthlyFee: 5000
-  }
+  },
+  auditLog: [] // [{ timestamp, module, itemData }]
 };
 
 /**
