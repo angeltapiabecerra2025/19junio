@@ -124,33 +124,103 @@ function calculateMatches(type) {
 
 function initDashboardChart() {
     const ctx = document.getElementById('mainChart').getContext('2d');
+    
+    // 1. Logic for grouping data by Month (e.g., '2026-03')
+    const incomeByMonth = {};
+    const expenseByMonth = {};
+    
+    // Helper: Add to map
+    const add = (map, date, amt) => {
+        const m = date.substring(0, 7); // YYYY-MM
+        map[m] = (map[m] || 0) + amt;
+    };
+    
+    // Aggregating Income
+    state.inventory.sales.forEach(s => add(incomeByMonth, s.date, s.total));
+    state.socios.forEach(socio => {
+        Object.keys(socio.payments || {}).forEach(mStr => {
+            if (socio.payments[mStr] === 'paid') incomeByMonth[mStr] = (incomeByMonth[mStr] || 0) + 5000;
+        });
+    });
+    state.finances.jerseys.forEach(j => add(incomeByMonth, j.date, j.amount));
+    state.finances.fiados.filter(f => f.paid).forEach(f => {
+        // Since fiados don't have a pay-date yet (simplified), we use 'current' or index
+        const m = new Date().toISOString().substring(0, 7);
+        incomeByMonth[m] = (incomeByMonth[m] || 0) + f.total;
+    });
+
+    // Aggregating Expenses
+    state.inventory.purchases.forEach(p => add(expenseByMonth, p.date, p.cost));
+    state.finances.misc.forEach(m => add(expenseByMonth, m.date, m.amount));
+
+    // Labels: Month names for last 6 months or all months with data
+    const labels = [...new Set([...Object.keys(incomeByMonth), ...Object.keys(expenseByMonth)])].sort();
+    const incomeData = labels.map(l => incomeByMonth[l] || 0);
+    const expenseData = labels.map(l => expenseByMonth[l] || 0);
+
+    // If no data, show a placeholder label
+    const displayLabels = labels.length ? labels : ['Sin datos'];
+    const displayIncome = incomeData.length ? incomeData : [0];
+    const displayExpense = expenseData.length ? expenseData : [0];
+
+    // Gradient creation
+    const gradientInc = ctx.createLinearGradient(0, 0, 0, 400);
+    gradientInc.addColorStop(0, 'rgba(0, 56, 168, 0.5)');
+    gradientInc.addColorStop(1, 'rgba(0, 56, 168, 0.0)');
+
+    const gradientExp = ctx.createLinearGradient(0, 0, 0, 400);
+    gradientExp.addColorStop(0, 'rgba(238, 28, 37, 0.5)');
+    gradientExp.addColorStop(1, 'rgba(238, 28, 37, 0.0)');
+
     app.chart = new Chart(ctx, {
-        type: 'bar',
+        type: 'line',
         data: {
-            labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
+            labels: displayLabels,
             datasets: [{
-                label: 'Ingresos',
-                data: [12000, 19000, 3000, 5000, 2000, 3000],
-                backgroundColor: 'rgba(0, 56, 168, 0.6)',
+                label: 'Ingresos Mensuales',
+                data: displayIncome,
                 borderColor: '#0038A8',
-                borderWidth: 1
+                backgroundColor: gradientInc,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#0038A8',
+                borderWidth: 3
             }, {
-                label: 'Egresos',
-                data: [7000, 11000, 5000, 8000, 3000, 4000],
-                backgroundColor: 'rgba(238, 28, 37, 0.6)',
+                label: 'Egresos Mensales',
+                data: displayExpense,
                 borderColor: '#EE1C25',
-                borderWidth: 1
+                backgroundColor: gradientExp,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#EE1C25',
+                borderWidth: 3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
-                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
-                x: { grid: { display: false } }
-            },
+            interaction: { intersect: false, mode: 'index' },
             plugins: {
-                legend: { labels: { color: '#F8FAFC' } }
+                legend: { position: 'top', labels: { color: '#F8FAFC', font: { weight: '600' } } },
+                tooltip: {
+                    backgroundColor: '#1E293B',
+                    titleColor: '#F8FAFC',
+                    bodyColor: '#94A3B8',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 12
+                }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true, 
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#94A3B8', callback: (val) => '$' + val.toLocaleString() }
+                },
+                x: { 
+                    grid: { display: false },
+                    ticks: { color: '#94A3B8' }
+                }
             }
         }
     });
