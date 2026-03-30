@@ -12,6 +12,10 @@ const app = {
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
+    if(!sessionStorage.getItem('version_alerted')) {
+        alert("✅ Sistema Actualizado a la Versión Final. Caché limpiada con éxito.");
+        sessionStorage.setItem('version_alerted', 'true');
+    }
     initNavigation();
     renderView('dashboard');
     updateGlobalStats();
@@ -263,23 +267,26 @@ function renderPartidos(container) {
                         </tr>
                     </thead>
                     <tbody id="match-list">
-                        ${state.matches.map((m, i) => `
-                            <tr>
-                                <td>${m.date}</td>
-                                <td>${m.opponent}</td>
-                                <td>
-                                    <span class="badge ${m.result === 'G' ? 'badge-paid' : m.result === 'P' ? 'badge-danger' : 'badge-pending'}">
-                                        ${m.result === 'G' ? 'Ganado' : m.result === 'P' ? 'Perdido' : 'Empate'}
-                                    </span>
-                                </td>
-                                <td>${m.scoreHome} - ${m.scoreAway}</td>
-                                <td>
-                                    <button class="btn btn-outline btn-sm" onclick="app.deleteMatch(${i})" title="Eliminar">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        `).join('')}
+                        ${state.matches.slice().reverse().map((m, i_orig) => {
+                            const i = state.matches.length - 1 - i_orig;
+                            return `
+                                <tr>
+                                    <td>${m.date}</td>
+                                    <td>${m.opponent}</td>
+                                    <td>
+                                        <span class="badge ${m.result === 'G' ? 'badge-paid' : m.result === 'P' ? 'badge-danger' : 'badge-pending'}">
+                                            ${m.result === 'G' ? 'Ganado' : m.result === 'P' ? 'Perdido' : 'Empate'}
+                                        </span>
+                                    </td>
+                                    <td>${m.scoreHome} - ${m.scoreAway}</td>
+                                    <td>
+                                        <button class="btn btn-outline btn-sm" onclick="app.deleteMatch(${i})" title="Eliminar">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -355,19 +362,22 @@ function renderInventario(container) {
                     <tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Costo</th><th>Acción</th></tr>
                 </thead>
                 <tbody>
-                    ${state.inventory.purchases.map((p, i) => `
-                        <tr>
-                            <td>${p.date}</td>
-                            <td>${p.productName}</td>
-                            <td>${p.quantity}</td>
-                            <td>$${p.cost.toLocaleString()}</td>
-                            <td>
-                                <button class="btn btn-outline btn-sm" onclick="app.deletePurchase(${i})">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `).join('')}
+                    ${state.inventory.purchases.slice().reverse().map((p, i_orig) => {
+                        const i = state.inventory.purchases.length - 1 - i_orig;
+                        return `
+                            <tr>
+                                <td>${p.date}</td>
+                                <td>${p.productName}</td>
+                                <td>${p.quantity}</td>
+                                <td>$${p.cost.toLocaleString()}</td>
+                                <td>
+                                    <button class="btn btn-outline btn-sm" onclick="app.deletePurchase(${i})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -410,25 +420,58 @@ window.app = window.app || {};
 window.app.showAddStock = (productId) => {
     const product = state.inventory.products.find(p => p.id === productId);
     const modalRoot = document.getElementById('modal-root');
+    const prevStock = product.stock;
+    const prevValue = prevStock * product.price;
+
     modalRoot.innerHTML = `
         <div class="modal-overlay">
-            <div class="modal">
+            <div class="modal" style="max-width: 600px;">
                 <h3>Ingresar Compra / Stock: ${product.name}</h3>
+                
+                <div style="margin: 1.5rem 0; background: var(--bg-light); padding: 1rem; border-radius: 8px;">
+                    <table class="cart-table">
+                        <thead>
+                            <tr>
+                                <th>Concepto</th>
+                                <th>Anterior</th>
+                                <th>Adición</th>
+                                <th>Actual (Total)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><b>Unidades</b></td>
+                                <td>${prevStock}</td>
+                                <td id="add-units-disp">0</td>
+                                <td id="total-units-disp" style="font-weight: bold; color: var(--primary-blue);">${prevStock}</td>
+                            </tr>
+                            <tr>
+                                <td><b>Valor ($)</b></td>
+                                <td>$${prevValue.toLocaleString()}</td>
+                                <td id="add-value-disp">$0</td>
+                                <td id="total-value-disp" style="font-weight: bold; color: var(--success);">$${prevValue.toLocaleString()}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
                 <form id="stock-form">
-                    <div class="form-group">
-                        <label>Cantidad Nueva (Unidades)</label>
-                        <input type="number" id="stock-qty" min="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Costo Total de Compra (Gasto)</label>
-                        <input type="number" id="stock-cost" min="0" placeholder="0 CLP" required>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>Cantidad Nueva (Unidades)</label>
+                            <input type="number" id="stock-qty" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Costo Total Compra (Gasto)</label>
+                            <input type="number" id="stock-cost" min="0" placeholder="0 CLP" required>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Nuevo Precio Venta (Opcional)</label>
-                        <input type="number" id="new-price" placeholder="${product.price}">
+                        <input type="number" id="new-price" placeholder="Actual: $${product.price}">
                     </div>
                     <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                        <button type="submit" class="btn btn-primary">Guardar</button>
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">Registrar Inventario</button>
                         <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-root').innerHTML = ''">Cancelar</button>
                     </div>
                 </form>
@@ -436,37 +479,65 @@ window.app.showAddStock = (productId) => {
         </div>
     `;
     
+    const qtyInput = document.getElementById('stock-qty');
+    const priceInput = document.getElementById('new-price');
+    
+    const updateDisplays = () => {
+        const qty = parseInt(qtyInput.value) || 0;
+        const price = parseInt(priceInput.value) || product.price;
+        
+        const totalQty = prevStock + qty;
+        const addValue = qty * price;
+        const totalValue = totalQty * price;
+        
+        document.getElementById('add-units-disp').innerText = `+${qty}`;
+        document.getElementById('total-units-disp').innerText = totalQty;
+        document.getElementById('add-value-disp').innerText = `$${addValue.toLocaleString()}`;
+        document.getElementById('total-value-disp').innerText = `$${totalValue.toLocaleString()}`;
+    };
+
+    qtyInput.oninput = updateDisplays;
+    priceInput.oninput = updateDisplays;
+    
     document.getElementById('stock-form').onsubmit = (e) => {
         e.preventDefault();
-        const qty = parseInt(document.getElementById('stock-qty').value);
+        const qty = parseInt(qtyInput.value);
         const cost = parseInt(document.getElementById('stock-cost').value);
-        const newPrice = parseInt(document.getElementById('new-price').value) || product.price;
+        const newPrice = parseInt(priceInput.value) || product.price;
         
-        // Update State
-        product.stock += qty;
-        product.price = newPrice;
-        
-        // Log Purchase as Expense
-        state.inventory.purchases.push({
-            date: new Date().toLocaleString(),
-            productId: product.id,
-            productName: product.name,
-            quantity: qty,
-            cost: cost
+        safeAction(() => {
+            product.stock += qty;
+            product.price = newPrice;
+            
+            state.inventory.purchases.push({
+                date: new Date().toLocaleString(),
+                productId: product.id,
+                productName: product.name,
+                quantity: qty,
+                cost: cost
+            });
+            document.getElementById('modal-root').innerHTML = '';
         });
-        
-        saveState(state);
-        document.getElementById('modal-root').innerHTML = '';
-        renderView('inventario');
     };
 };
 
 function renderVentas(container) {
-  container.innerHTML = `
+    if (!app.cart) app.cart = [];
+
+    const updateCalculatorFromCart = () => {
+        const total = app.cart.reduce((acc, item) => acc + item.total, 0);
+        const calcTotalRow = document.getElementById('calc-total');
+        if (calcTotalRow) {
+            calcTotalRow.value = total;
+            calcTotalRow.dispatchEvent(new Event('input'));
+        }
+    };
+
+    container.innerHTML = `
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
         <div class="card">
-            <h3>Registrar Venta</h3>
-            <form id="sale-form">
+            <h3>Nueva Venta (Carrito)</h3>
+            <form id="cart-add-form" style="margin-bottom: 1.5rem; border-bottom: 1px dashed var(--border-clr); padding-bottom: 1.5rem;">
                 <div class="form-group">
                     <label>Producto</label>
                     <select id="sale-product">
@@ -481,173 +552,248 @@ function renderVentas(container) {
                     <label>Cantidad</label>
                     <input type="number" id="sale-qty" min="1" value="1" required>
                 </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Finalizar Venta (Suma Ingreso)</button>
+                <button type="submit" class="btn btn-outline" style="width: 100%;">
+                    <i class="fas fa-cart-plus"></i> Agregar al Carrito
+                </button>
             </form>
+
+            <div id="cart-container">
+                <table class="cart-table">
+                    <thead>
+                        <tr><th>Producto</th><th>Cant.</th><th>Subtotal</th><th></th></tr>
+                    </thead>
+                    <tbody id="cart-list">
+                        ${app.cart.map((item, idx) => `
+                            <tr>
+                                <td>${item.productName}</td>
+                                <td>${item.quantity}</td>
+                                <td>$${item.total.toLocaleString()}</td>
+                                <td><button class="btn btn-sm" onclick="app.removeFromCart(${idx})"><i class="fas fa-times"></i></button></td>
+                            </tr>
+                        `).join('')}
+                        ${app.cart.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Carrito vacío</td></tr>' : ''}
+                    </tbody>
+                </table>
+                <div style="margin-top: 1rem; text-align: right;">
+                    <label>TOTAL VENTA</label>
+                    <div class="total-display" id="cart-total-display">$${app.cart.reduce((acc, i) => acc + i.total, 0).toLocaleString()}</div>
+                </div>
+                <button id="finalize-sale-btn" class="btn btn-primary" style="width: 100%; margin-top: 1rem;" ${app.cart.length === 0 ? 'disabled' : ''}>
+                    <i class="fas fa-check-circle"></i> Confirmar y Finalizar Venta
+                </button>
+            </div>
         </div>
         
         <div class="card" style="border-left: 4px solid var(--secondary-red);">
             <h3>Calculadora de Vuelto</h3>
             <div class="form-group">
                 <label>Total Compra</label>
-                <input type="number" id="calc-total" value="${app.lastSaleTotal || 0}" placeholder="0">
+                <input type="number" id="calc-total" class="input-total-sync" value="0">
             </div>
             <div class="form-group">
                 <label>Paga con</label>
-                <input type="number" id="calc-paid" placeholder="0">
+                <input type="number" id="calc-paid" style="font-size: 1.5rem; text-align: center;" placeholder="0">
             </div>
-            <div style="background: var(--bg-darker); padding: 1rem; border-radius: 8px; text-align: center;">
-                <label>VUELTO A ENTREGAR</label>
-                <h2 id="calc-result" style="color: var(--success);">$0</h2>
+            <div style="background: var(--bg-darker); padding: 1.5rem; border-radius: 12px; text-align: center; border: 2px solid var(--border-clr);">
+                <label style="font-weight: 800; letter-spacing: 1px;">VUELTO A ENTREGAR</label>
+                <h1 id="calc-result" style="color: var(--success); font-size: 3rem; margin-top: 0.5rem;">$0</h1>
             </div>
         </div>
     </div>
     
     <div class="card" style="margin-top: 2rem;">
-        <h3>Ventas Recientes</h3>
+        <h3>Historial de Ventas Recientes</h3>
         <div class="table-container">
             <table>
                 <thead>
                     <tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Total</th><th>Acción</th></tr>
                 </thead>
                 <tbody id="sales-list">
-                    ${state.inventory.sales.map((s, i) => `
-                        <tr>
-                            <td>${s.date}</td>
-                            <td>${s.productName}</td>
-                            <td>${s.quantity}</td>
-                            <td>$${s.total.toLocaleString()}</td>
-                            <td>
-                                <button class="btn btn-outline btn-sm" onclick="app.deleteSale(${i})">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `).reverse().slice(0, 10).join('')}
+                    ${state.inventory.sales.slice().reverse().map((s, i_orig) => {
+                        const i = state.inventory.sales.length - 1 - i_orig;
+                        return `
+                            <tr>
+                                <td>${s.date}</td>
+                                <td>${s.productName}</td>
+                                <td>${s.quantity}</td>
+                                <td>$${s.total.toLocaleString()}</td>
+                                <td>
+                                    <button class="btn btn-outline btn-sm" onclick="app.deleteSale(${i})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
     </div>
-  `;
-  
-  // Sale logic
-  document.getElementById('sale-form').onsubmit = (e) => {
-      e.preventDefault();
-      const pId = document.getElementById('sale-product').value;
-      const qty = parseInt(document.getElementById('sale-qty').value);
-      const product = state.inventory.products.find(p => p.id === pId);
-      
-      if (product.stock < qty) {
-          alert('Stock insuficiente');
-          return;
-      }
-      
-      const total = product.price * qty;
-      
-      safeAction(() => {
-          product.stock -= qty;
-          app.lastSaleTotal = total; // Store for next render
-          
-          state.inventory.sales.push({
-              date: new Date().toLocaleString(),
-              productId: pId,
-              productName: product.name,
-              quantity: qty,
-              price: product.price,
-              total: total
-          });
-      });
-  };
+    `;
+    
+    // Logic for Cart
+    document.getElementById('cart-add-form').onsubmit = (e) => {
+        e.preventDefault();
+        const pId = document.getElementById('sale-product').value;
+        const qty = parseInt(document.getElementById('sale-qty').value);
+        const product = state.inventory.products.find(p => p.id === pId);
+        
+        if (product.stock < qty) {
+            alert('Stock insuficiente');
+            return;
+        }
 
-  // Calculator Logic
-  const tIn = document.getElementById('calc-total');
-  const pIn = document.getElementById('calc-paid');
-  const resDisp = document.getElementById('calc-result');
-  
-  const updCalc = () => {
-      const totalVal = parseInt(tIn.value) || 0;
-      const paidVal = parseInt(pIn.value) || 0;
-      const diff = paidVal - totalVal;
-      resDisp.innerText = `$${diff.toLocaleString()} CLP`;
-  };
-  
-  tIn.oninput = updCalc;
-  pIn.oninput = updCalc;
-  updCalc(); // Initial run on render
+        app.cart.push({
+            productId: pId,
+            productName: product.name,
+            quantity: qty,
+            price: product.price,
+            total: product.price * qty
+        });
+        
+        renderVentas(container);
+    };
+
+    window.app.removeFromCart = (idx) => {
+        app.cart.splice(idx, 1);
+        renderVentas(container);
+    };
+
+    document.getElementById('finalize-sale-btn').onclick = () => {
+        if (app.cart.length === 0) return;
+        
+        safeAction(() => {
+            app.cart.forEach(item => {
+                const product = state.inventory.products.find(p => p.id === item.productId);
+                if (product) product.stock -= item.quantity;
+                
+                state.inventory.sales.push({
+                    date: new Date().toLocaleString(),
+                    productId: item.productId,
+                    productName: item.productName,
+                    quantity: item.quantity,
+                    price: item.price,
+                    total: item.total
+                });
+            });
+            app.cart = [];
+            renderView('ventas');
+        });
+    };
+
+    // Calculator Logic
+    const tIn = document.getElementById('calc-total');
+    const pIn = document.getElementById('calc-paid');
+    const resDisp = document.getElementById('calc-result');
+    
+    const updCalc = () => {
+        const totalVal = parseInt(tIn.value) || 0;
+        const paidVal = parseInt(pIn.value) || 0;
+        const diff = paidVal - totalVal;
+        resDisp.innerText = `$${(diff > 0 ? diff : 0).toLocaleString()}`;
+        resDisp.style.color = diff >= 0 ? 'var(--success)' : 'var(--secondary-red)';
+    };
+    
+    tIn.oninput = updCalc;
+    pIn.oninput = updCalc;
+    
+    updateCalculatorFromCart();
 }
 
 function calculateSocioDebt(socio) {
   const fee = 5000;
+  const cycleMonths = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]; // Mar to Dec
+  const totalPaid = socio.totalPaid || 0;
+  
+  // Calculate how many months the totalPaid covers
+  const monthsCovered = Math.floor(totalPaid / fee);
+  
+  // Current month index in the cycle (0-based)
   const now = new Date();
-  const currentYear = now.getFullYear();
-  
-  const cycleMonths = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "01", "02"];
-  const currentMonthKey = (now.getMonth() + 1).toString().padStart(2, '0');
-  
-  const joinDate = new Date(socio.joinDate);
-  const joinMonthKey = (joinDate.getMonth() + 1).toString().padStart(2, '0');
-  const joinYear = joinDate.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  let currentIdxInCycle = currentMonth >= 3 ? currentMonth - 3 : -1; // -1 if before March
+  if (currentIdxInCycle > 9) currentIdxInCycle = 9; // Cap at Dec
 
   let debt = 0;
-  let startedCounting = false;
-
-  for (const m of cycleMonths) {
-      const year = (parseInt(m) < 3) ? currentYear + (currentYear > joinYear ? 0 : 1) : currentYear;
-      const key = `${currentYear}-${m}`;
-      
-      // Start counting if we reached the join month OR if we are past the join month in the cycle
-      if (!startedCounting) {
-          if (m === joinMonthKey) startedCounting = true;
-          // Note: This is simpler for a single-year cycle.
+  if (currentIdxInCycle >= 0) {
+      const requiredMonths = currentIdxInCycle + 1;
+      if (monthsCovered < requiredMonths) {
+          debt = (requiredMonths - monthsCovered) * fee;
       }
-
-      if (startedCounting || parseInt(m) >= 3 || (joinYear < currentYear)) {
-          // If the month is in the past relative to now in the cycle
-          if (!socio.payments[key]) debt += fee;
-      }
-
-      if (m === currentMonthKey) break;
   }
   return debt;
 }
 
 function renderSocios(container) { 
+  const cycleMonths = [
+    { k: "03", n: "Mar" }, { k: "04", n: "Abr" }, { k: "05", n: "May" },
+    { k: "06", n: "Jun" }, { k: "07", n: "Jul" }, { k: "08", n: "Ago" },
+    { k: "09", n: "Sep" }, { k: "10", n: "Oct" }, { k: "11", n: "Nov" },
+    { k: "12", n: "Dic" }
+  ];
+
   container.innerHTML = `
     <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3>Listado de Socios (Ciclo Mar-Feb)</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <div>
+                <h3>Planilla de Cuotas de Socios</h3>
+                <p class="text-muted" style="font-size: 0.8rem;">Ciclo Deportivo: Marzo - Diciembre (Cuota: $5.000)</p>
+            </div>
             <button class="btn btn-primary btn-sm" onclick="app.showAddSocio()">
                 <i class="fas fa-user-plus"></i> Nuevo Socio
             </button>
         </div>
-        <div class="table-container">
+
+        <div class="socio-grid-container">
             <table>
                 <thead>
                     <tr>
-                        <th>Nombre</th>
-                        <th>Estado</th>
-                        <th>Pendiente</th>
-                        <th>Acción</th>
+                        <th style="min-width: 150px;">Socio</th>
+                        ${cycleMonths.map(m => `<th class="socio-month-header">${m.n}</th>`).join('')}
+                        <th style="text-align: right;">Total Pagado</th>
+                        <th style="text-align: right;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${state.socios.length === 0 ? '<tr><td colspan="4" style="text-align:center;">No hay socios registrados.</td></tr>' : ''}
+                    ${state.socios.length === 0 ? '<tr><td colspan="13" style="text-align:center; padding: 2rem;">No hay socios registrados.</td></tr>' : ''}
                     ${state.socios.map((s, i) => {
+                        const totalPaid = s.totalPaid || 0;
+                        const monthsCovered = Math.floor(totalPaid / 5000);
                         const debt = calculateSocioDebt(s);
+
                         return `
                         <tr>
-                            <td>${s.name}</td>
-                            <td><span class="badge ${debt === 0 ? 'badge-paid' : 'badge-danger'}">${debt === 0 ? 'Al día' : 'Deuda'}</span></td>
-                            <td>$${debt.toLocaleString()}</td>
                             <td>
-                                <button class="btn btn-primary btn-sm" onclick="app.showPaySocio('${s.id}')">
-                                    <i class="fas fa-dollar-sign"></i> Pagar
-                                </button>
-                                <button class="btn btn-outline btn-sm" onclick="app.showEditSocio('${s.id}')">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn btn-outline btn-sm" onclick="app.deleteSocio('${s.id}')" title="Eliminar Socio">
-                                    <i class="fas fa-trash"></i>
-                                </button>
+                                <div><b>${s.name}</b></div>
+                                <div style="font-size: 0.7rem; color: ${debt === 0 ? 'var(--success)' : 'var(--secondary-red)'};">
+                                    ${debt === 0 ? 'AL DÍA' : `DEUDA: $${debt.toLocaleString()}`}
+                                </div>
+                            </td>
+                            ${cycleMonths.map((m, idx) => {
+                                const isPaid = idx < monthsCovered;
+                                return `
+                                    <td class="socio-month-cell">
+                                        <div class="month-badge ${isPaid ? 'month-paid' : 'month-debt'}" title="${isPaid ? 'Pagado' : 'Pendiente'}">
+                                            ${isPaid ? '<i class="fas fa-check"></i>' : '<i class="fas fa-clock"></i>'}
+                                        </div>
+                                    </td>
+                                `;
+                            }).join('')}
+                            <td style="text-align: right; font-family: 'Outfit', sans-serif; font-weight: 600;">
+                                $${totalPaid.toLocaleString()}
+                            </td>
+                            <td style="text-align: right;">
+                                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                    <button class="btn btn-primary btn-sm" onclick="app.showEditSocioPayments('${s.id}')" title="Editar Pagos">
+                                        <i class="fas fa-dollar-sign"></i>
+                                    </button>
+                                    <button class="btn btn-outline btn-sm" onclick="app.showEditSocio('${s.id}')">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-outline btn-sm" onclick="app.deleteSocio('${s.id}')" title="Eliminar Socio">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>`;
                     }).join('')}
@@ -657,6 +803,54 @@ function renderSocios(container) {
     </div>
   `;
 }
+
+window.app.showEditSocioPayments = (id) => {
+    const socio = state.socios.find(s => s.id === id);
+    const modalRoot = document.getElementById('modal-root');
+    modalRoot.innerHTML = `
+        <div class="modal-overlay">
+            <div class="modal">
+                <h3>Actualizar Monto Pagado: ${socio.name}</h3>
+                <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1.5rem;">
+                    Ingrese el total de dinero que este socio ha pagado a la fecha. El sistema distribuirá este monto entre los meses (Marzo a Diciembre).
+                </p>
+                <form id="edit-payments-form">
+                    <div class="form-group">
+                        <label>Monto Total Acumulado (CLP)</label>
+                        <input type="number" id="ep-total-paid" value="${socio.totalPaid || 0}" step="5000" min="0" required>
+                    </div>
+                    <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px;">
+                        <p id="meses-cubiertos" style="font-weight: 600; font-size: 0.9rem; color: var(--primary-blue);"></p>
+                    </div>
+                    <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">Guardar Cambios</button>
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-root').innerHTML = ''">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    const input = document.getElementById('ep-total-paid');
+    const display = document.getElementById('meses-cubiertos');
+    const updateMsg = () => {
+        const val = parseInt(input.value) || 0;
+        const months = Math.floor(val / 5000);
+        display.innerText = `Este monto cubre ${months} mes(es) del ciclo deportivo.`;
+    };
+    input.oninput = updateMsg;
+    updateMsg();
+
+    document.getElementById('edit-payments-form').onsubmit = (e) => {
+        e.preventDefault();
+        const newVal = parseInt(input.value);
+        safeAction(() => {
+            socio.totalPaid = newVal;
+            document.getElementById('modal-root').innerHTML = '';
+            renderView('socios');
+        });
+    };
+};
 
 window.app.showEditSocio = (id) => {
     const socio = state.socios.find(s => s.id === id);
@@ -695,8 +889,7 @@ window.app.deleteSocio = (id) => {
     safeAction(() => {
         state.socios.splice(socioIdx, 1);
         renderView('socios');
-        saveState(state);
-    }, { module: 'Socios', itemData: `Socio: ${socio.name} (ID: ${socio.id})` });
+    }, { module: 'Socios', item: socio });
 };
 
 window.app.showAddSocio = () => {
@@ -726,54 +919,10 @@ window.app.showAddSocio = () => {
                 id: 's' + Date.now(),
                 name: name,
                 joinDate: new Date().toISOString().split('T')[0],
+                totalPaid: 0,
                 payments: {}
             });
             document.getElementById('modal-root').innerHTML = '';
-        });
-    };
-};
-
-window.app.showPaySocio = (id) => {
-    const socio = state.socios.find(s => s.id === id);
-    const modalRoot = document.getElementById('modal-root');
-    modalRoot.innerHTML = `
-        <div class="modal-overlay">
-            <div class="modal">
-                <h3>Registrar Pago: ${socio.name}</h3>
-                <form id="pay-form">
-                    <div class="form-group">
-                        <label>Monto a Pagar (CLP)</label>
-                        <input type="number" id="pay-amount" min="5000" step="5000" value="5000" required>
-                    </div>
-                    <p class="text-muted" style="font-size: 0.8rem;">Note: Pagos superiores a 5000 cubrirán meses atrasados.</p>
-                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                        <button type="submit" class="btn btn-primary">Confirmar Pago</button>
-                        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-root').innerHTML = ''">Cancelar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    document.getElementById('pay-form').onsubmit = (e) => {
-        e.preventDefault();
-        const amount = parseInt(document.getElementById('pay-amount').value);
-        safeAction(() => {
-            const monthsToPay = Math.floor(amount / 5000);
-            const cycleMonths = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "01", "02"];
-            const currentYear = new Date().getFullYear();
-            
-            let paidCount = 0;
-            for (const mKey of cycleMonths) {
-                if (paidCount >= monthsToPay) break;
-                const year = (parseInt(mKey) < 3) ? currentYear + 1 : currentYear; // Simplifiedrollover
-                const key = `${currentYear}-${mKey}`;
-                if (!socio.payments[key]) {
-                    socio.payments[key] = 'paid';
-                    paidCount++;
-                }
-            }
-            document.getElementById('modal-root').innerHTML = '';
-            renderView('socios');
         });
     };
 };
@@ -800,13 +949,16 @@ function renderCamisetas(container) {
                     <tr><th>Fecha</th><th>Monto</th><th>Acción</th></tr>
                 </thead>
                 <tbody>
-                    ${state.finances.jerseys.map((j, i) => `
-                        <tr>
-                            <td>${j.date}</td>
-                            <td>$${j.amount.toLocaleString()}</td>
-                            <td><button class="btn btn-outline btn-sm" onclick="app.deleteJersey(${i})"><i class="fas fa-trash"></i></button></td>
-                        </tr>
-                    `).join('')}
+                    ${state.finances.jerseys.slice().reverse().map((j, i_orig) => {
+                        const i = state.finances.jerseys.length - 1 - i_orig;
+                        return `
+                            <tr>
+                                <td>${j.date}</td>
+                                <td>$${j.amount.toLocaleString()}</td>
+                                <td><button class="btn btn-outline btn-sm" onclick="app.deleteJersey(${i})"><i class="fas fa-trash"></i></button></td>
+                            </tr>
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -848,14 +1000,17 @@ function renderGastosVarios(container) {
                     <tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Acción</th></tr>
                 </thead>
                 <tbody>
-                    ${state.finances.misc.map((m, i) => `
-                        <tr>
-                            <td>${m.date}</td>
-                            <td>${m.desc}</td>
-                            <td>$${m.amount.toLocaleString()}</td>
-                            <td><button class="btn btn-outline btn-sm" onclick="app.deleteMisc(${i})"><i class="fas fa-trash"></i></button></td>
-                        </tr>
-                    `).join('')}
+                    ${state.finances.misc.slice().reverse().map((m, i_orig) => {
+                        const i = state.finances.misc.length - 1 - i_orig;
+                        return `
+                            <tr>
+                                <td>${m.date}</td>
+                                <td>${m.desc}</td>
+                                <td>$${m.amount.toLocaleString()}</td>
+                                <td><button class="btn btn-outline btn-sm" onclick="app.deleteMisc(${i})"><i class="fas fa-trash"></i></button></td>
+                            </tr>
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -875,76 +1030,141 @@ function renderGastosVarios(container) {
 function renderFiados(container) {
   container.innerHTML = `
     <div class="card">
-        <h3>Control de Fiados y Créditos</h3>
-        <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Administra las deudas pendientes de cobro.</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3>Control de Fiados y Créditos</h3>
+            <button class="btn btn-primary btn-sm" onclick="app.showAddFiado()">
+                <i class="fas fa-plus"></i> Nuevo Registro de Fiado
+            </button>
+        </div>
+        <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">
+            Nota: Los fiados pendientes se consideran "Egresos" en el balance (capital fuera del club).
+        </p>
         <div class="table-container">
             <table>
                 <thead>
-                    <tr><th>Nombre Deudor</th><th>Producto</th><th>Total</th><th>Estado</th><th>Acción</th></tr>
+                    <tr><th>Nombre Deudor</th><th>Productos</th><th>Total</th><th>Estado</th><th>Acción</th></tr>
                 </thead>
                 <tbody>
-                    ${state.finances.fiados.map((f, i) => `
-                        <tr>
-                            <td>${f.name}</td>
-                            <td>${f.product} (${f.quantity})</td>
-                            <td>$${f.total.toLocaleString()}</td>
-                            <td>
-                                ${f.paid ? '<span class="badge badge-paid">Pagado</span>' : '<span class="badge badge-danger">Pendiente</span>'}
-                            </td>
-                            <td>
-                                ${!f.paid ? `<button class="btn btn-primary btn-sm" onclick="app.markFiadoPaid(${i})">Marcar Pagado</button>` : ''}
-                                <button class="btn btn-outline btn-sm" onclick="app.deleteFiado(${i})"><i class="fas fa-trash"></i></button>
-                            </td>
-                        </tr>
-                    `).join('')}
+                    ${state.finances.fiados.slice().reverse().map((f, i_orig) => {
+                        const i = state.finances.fiados.length - 1 - i_orig;
+                        return `
+                            <tr>
+                                <td><b>${f.name}</b></td>
+                                <td style="font-size: 0.8rem; color: var(--text-muted);">
+                                    ${f.items.map(it => `${it.productName} (x${it.quantity})`).join(', ')}
+                                </td>
+                                <td>$${f.total.toLocaleString()}</td>
+                                <td>
+                                    ${f.paid ? '<span class="badge badge-paid">Pagado</span>' : '<span class="badge badge-danger">Pendiente</span>'}
+                                </td>
+                                <td>
+                                    ${!f.paid ? `<button class="btn btn-primary btn-sm" onclick="app.markFiadoPaid(${i})">Liquidar Deuda</button>` : ''}
+                                    <button class="btn btn-outline btn-sm" onclick="app.deleteFiado(${i})"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                    ${state.finances.fiados.length === 0 ? '<tr><td colspan="5" style="text-align:center;">No hay registros de fiados.</td></tr>' : ''}
                 </tbody>
             </table>
         </div>
-        <button class="btn btn-outline" style="margin-top: 1rem;" onclick="app.showAddFiado()">
-            <i class="fas fa-plus"></i> Agregar Nuevo Fiado
-        </button>
     </div>
   `;
 }
 
 function renderFinanzas(container) { 
-  const totalSales = state.inventory.sales.reduce((acc, s) => acc + s.total, 0);
-  const totalJerseys = state.finances.jerseys.reduce((acc, j) => acc + j.amount, 0);
-  const totalSocioPayments = state.socios.reduce((acc, s) => {
-      return acc + (Object.keys(s.payments).filter(m => s.payments[m] === 'paid').length * (state.settings.monthlyFee || 5000));
-  }, 0);
-  const totalFiadosPaid = state.finances.fiados.filter(f => f.paid).reduce((acc, f) => acc + f.total, 0);
+  if (!app.finances) {
+      const today = new Date();
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+      app.finances = { startDate: firstDay, endDate: lastDay };
+  }
+
+  const parseDate = (dStr) => {
+      // Handles both LocaleString and YYYY-MM-DD
+      if (dStr.includes('/')) {
+          const [d, m, y] = dStr.split(',')[0].split('/');
+          return new Date(`${y}-${m}-${d}`);
+      }
+      return new Date(dStr);
+  };
+
+  const isInRange = (dateStr) => {
+      const d = parseDate(dateStr);
+      const start = new Date(app.finances.startDate);
+      const end = new Date(app.finances.endDate);
+      end.setHours(23, 59, 59);
+      return d >= start && d <= end;
+  };
+
+  // Filtered Data
+  const fallbackDate = new Date().toLocaleDateString();
+  const fSales = state.inventory.sales.filter(s => isInRange(s.date || fallbackDate));
+  const fJerseys = state.finances.jerseys.filter(j => isInRange(j.date || fallbackDate));
+  const fMisc = state.finances.misc.filter(m => isInRange(m.date || fallbackDate));
+  const fPurchases = state.inventory.purchases.filter(p => isInRange(p.date || fallbackDate));
+  const fFiadosPending = state.finances.fiados.filter(f => !f.paid && isInRange(f.date || new Date().toLocaleDateString()));
+  const fFiadosRecovered = state.finances.fiados.filter(f => f.paid && isInRange(f.date || new Date().toLocaleDateString()));
   
-  const totalIn = totalSales + totalJerseys + totalSocioPayments + totalFiadosPaid;
-  const totalPurchases = state.inventory.purchases.reduce((acc, p) => acc + p.cost, 0);
-  const totalMiscExpenses = state.finances.misc.reduce((acc, m) => acc + m.amount, 0);
+  // For Socios, since we don't have individual payment dates in the new logic, 
+  // we'll assume the payments are for the current month if not specified.
+  // Ideally we should track this, but for now we'll use a simplified approach or skip filtering if no date available.
+  const totalSocioIncome = state.socios.reduce((acc, s) => acc + (s.totalPaid || 0), 0); 
+  // Note: This is an area where the user might want more granular filtering later.
+
+  const totalSalesVal = fSales.reduce((acc, s) => acc + s.total, 0);
+  const totalJerseysVal = fJerseys.reduce((acc, j) => acc + j.amount, 0);
+  const totalFiadosRecoveredVal = fFiadosRecovered.reduce((acc, f) => acc + f.total, 0);
   
-  const totalOut = totalPurchases + totalMiscExpenses;
+  const totalIn = totalSalesVal + totalJerseysVal + totalSocioIncome + totalFiadosRecoveredVal;
+  
+  const totalPurchasesVal = fPurchases.reduce((acc, p) => acc + p.cost, 0);
+  const totalMiscVal = fMisc.reduce((acc, m) => acc + m.amount, 0);
+  const totalFiadosPendingVal = fFiadosPending.reduce((acc, f) => acc + f.total, 0); // User requested fiados as egresos
+  
+  const totalOut = totalPurchasesVal + totalMiscVal + totalFiadosPendingVal;
 
   container.innerHTML = `
     <div id="balance-report">
-        <div class="card" style="border-left: 5px solid var(--primary-blue); margin-bottom: 2rem;">
+        <div class="card" style="margin-bottom: 2rem; border-top: 4px solid var(--primary-blue);">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h2>Balance General</h2>
-                    <p class="text-muted">Estado financiero consolidado al ${new Date().toLocaleDateString()}</p>
+                    <h2>Balance y Estadísticas</h2>
+                    <p class="text-muted">Control financiero por rango de fechas</p>
                 </div>
-                <img src="img/logo.png" style="width: 60px;">
+                <div style="display: flex; gap: 1rem; align-items: flex-end;">
+                    <div class="form-group" style="margin:0;">
+                        <label>Desde</label>
+                        <input type="date" id="fin-start" value="${app.finances.startDate}">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Hasta</label>
+                        <input type="date" id="fin-end" value="${app.finances.endDate}">
+                    </div>
+                    <button id="apply-filter-btn" class="btn btn-primary" style="height: 42px;"><i class="fas fa-filter"></i></button>
+                </div>
             </div>
         </div>
 
         <div class="stat-grid">
             <div class="card" style="border-bottom: 4px solid var(--success);">
-                <label>Ingresos Totales (Recaudado)</label>
+                <label>Ingresos (Entradas)</label>
                 <h2 style="color: var(--success);">$${totalIn.toLocaleString()}</h2>
             </div>
             <div class="card" style="border-bottom: 4px solid var(--secondary-red);">
-                <label>Egresos Totales (Gastos)</label>
+                <label>Egresos (Salidas + Fiados)</label>
                 <h2 style="color: var(--secondary-red);">$${totalOut.toLocaleString()}</h2>
             </div>
             <div class="card" style="border-bottom: 4px solid var(--primary-blue);">
-                <label>Resultado Neto</label>
-                <h2>$${(totalIn - totalOut).toLocaleString()}</h2>
+                <label>Balance Neto</label>
+                <h2 style="${totalIn - totalOut < 0 ? 'color: var(--secondary-red)' : ''}">$${(totalIn - totalOut).toLocaleString()}</h2>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem;">
+            <h3>Comparativa Mensual: Ingresos vs Egresos</h3>
+            <div style="height: 300px; margin-top: 1rem;">
+                <canvas id="finance-chart"></canvas>
             </div>
         </div>
 
@@ -952,13 +1172,13 @@ function renderFinanzas(container) {
             <div class="card">
                 <h3>Detalle de Ingresos</h3>
                 <div class="table-container">
-                    <table>
-                        <tr><td>Ventas Inventario</td><td style="text-align:right;">+ $${totalSales.toLocaleString()}</td></tr>
-                        <tr><td>Cuotas de Socios</td><td style="text-align:right;">+ $${totalSocioPayments.toLocaleString()}</td></tr>
-                        <tr><td>Venta de Camisetas</td><td style="text-align:right;">+ $${totalJerseys.toLocaleString()}</td></tr>
-                        <tr><td>Fiados Recuperados</td><td style="text-align:right;">+ $${totalFiadosPaid.toLocaleString()}</td></tr>
-                        <tr style="font-weight:bold; border-top: 2px solid var(--border-clr);">
-                            <td>TOTAL INGRESOS</td><td style="text-align:right;">$${totalIn.toLocaleString()}</td>
+                    <table class="cart-table">
+                        <tr><td>Ventas Corrientes</td><td style="text-align:right;">+ $${totalSalesVal.toLocaleString()}</td></tr>
+                        <tr><td>Cuotas Socios (Histórico)</td><td style="text-align:right;">+ $${totalSocioIncome.toLocaleString()}</td></tr>
+                        <tr><td>Indumentaria/Camisetas</td><td style="text-align:right;">+ $${totalJerseysVal.toLocaleString()}</td></tr>
+                        <tr><td>Fiados Recuperados</td><td style="text-align:right;">+ $${totalFiadosRecoveredVal.toLocaleString()}</td></tr>
+                        <tr style="font-weight:bold; border-top: 2px solid var(--border-clr); font-size: 1.1rem;">
+                            <td>TOTAL</td><td style="text-align:right; color: var(--success);">$${totalIn.toLocaleString()}</td>
                         </tr>
                     </table>
                 </div>
@@ -967,66 +1187,203 @@ function renderFinanzas(container) {
             <div class="card">
                 <h3>Detalle de Egresos</h3>
                 <div class="table-container">
-                    <table>
-                        <tr><td>Compras de Stock</td><td style="text-align:right;">- $${totalPurchases.toLocaleString()}</td></tr>
-                        <tr><td>Gastos Varios</td><td style="text-align:right;">- $${totalMiscExpenses.toLocaleString()}</td></tr>
-                        <tr style="font-weight:bold; border-top: 2px solid var(--border-clr);">
-                            <td>TOTAL EGRESOS</td><td style="text-align:right;">$${totalOut.toLocaleString()}</td>
+                    <table class="cart-table">
+                        <tr><td>Compras Stock</td><td style="text-align:right;">- $${totalPurchasesVal.toLocaleString()}</td></tr>
+                        <tr><td>Gastos Varios</td><td style="text-align:right;">- $${totalMiscVal.toLocaleString()}</td></tr>
+                        <tr style="color: var(--secondary-red);"><td>Fiados Pendientes</td><td style="text-align:right;">- $${totalFiadosPendingVal.toLocaleString()}</td></tr>
+                        <tr style="font-weight:bold; border-top: 2px solid var(--border-clr); font-size: 1.1rem;">
+                            <td>TOTAL</td><td style="text-align:right; color: var(--secondary-red);">$${totalOut.toLocaleString()}</td>
                         </tr>
                     </table>
                 </div>
             </div>
         </div>
 
-        <div class="card" style="margin-top: 2rem; text-align: center;">
-            <button class="btn btn-primary" onclick="app.exportPDF()">
-                <i class="fas fa-file-pdf"></i> Descargar Balance Professional (PDF)
+        <div class="card" style="margin-top: 2rem; text-align: center; border: 1px dashed var(--primary-blue);">
+            <button class="btn btn-outline" onclick="app.exportPDF()">
+                <i class="fas fa-file-pdf"></i> Generar Reporte PDF Profesional
             </button>
         </div>
     </div>
   `;
+
+  // Filter Actions
+  document.getElementById('apply-filter-btn').onclick = () => {
+      app.finances.startDate = document.getElementById('fin-start').value;
+      app.finances.endDate = document.getElementById('fin-end').value;
+      renderFinanzas(container);
+  };
+
+  // Chart Logic
+  const ctx = document.getElementById('finance-chart').getContext('2d');
+  
+  // Generate labels (last 6 months or filtered range)
+  const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const labels = [];
+  const inData = [];
+  const outData = [];
+  
+  // Simplified: Show data for months in the filtered range
+  const start = new Date(app.finances.startDate);
+  const end = new Date(app.finances.endDate);
+  
+  let curr = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (curr <= end) {
+      const label = `${months[curr.getMonth()]} ${curr.getFullYear().toString().slice(-2)}`;
+      labels.push(label);
+      
+      const mKey = `${curr.getFullYear()}-${(curr.getMonth()+1).toString().padStart(2, '0')}`;
+      
+      // Calculate month totals
+      const mIn = state.inventory.sales.filter(s => (s.date || '').includes(mKey)).reduce((a, b) => a + b.total, 0) +
+                  state.finances.jerseys.filter(j => (j.date || '').includes(mKey)).reduce((a, b) => a + b.amount, 0);
+                  
+      const mOut = state.inventory.purchases.filter(p => (p.date || '').includes(mKey)).reduce((a, b) => a + b.cost, 0) +
+                   state.finances.misc.filter(mx => (mx.date || '').includes(mKey)).reduce((a, b) => a + b.amount, 0);
+      
+      inData.push(mIn);
+      outData.push(mOut);
+      
+      curr.setMonth(curr.getMonth() + 1);
+      if (labels.length > 12) break; // Limit to 12 months
+  }
+
+  app.chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+          labels: labels,
+          datasets: [
+              {
+                  label: 'Ingresos',
+                  data: inData,
+                  backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                  borderRadius: 6
+              },
+              {
+                  label: 'Egresos',
+                  data: outData,
+                  backgroundColor: 'rgba(238, 28, 37, 0.7)',
+                  borderRadius: 6
+              }
+          ]
+      },
+      options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+              legend: { position: 'bottom' }
+          },
+          scales: {
+              y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+              x: { grid: { display: false } }
+          }
+      }
+  });
 }
 
 window.app.showAddFiado = () => {
-    const modalRoot = document.getElementById('modal-root');
-    modalRoot.innerHTML = `
-        <div class="modal-overlay">
-            <div class="modal">
-                <h3>Nuevo Fiado</h3>
-                <form id="fiado-form">
-                    <div class="form-group"><label>Nombre</label><input type="text" id="f-name" required></div>
-                    <div class="form-group">
-                        <label>Producto</label>
-                        <select id="f-prod">
-                            ${state.inventory.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-                        </select>
+    if (!app.fiadoCart) app.fiadoCart = [];
+    
+    const renderFiadoModal = () => {
+        const modalRoot = document.getElementById('modal-root');
+        modalRoot.innerHTML = `
+            <div class="modal-overlay">
+                <div class="modal" style="max-width: 600px;">
+                    <h3>Registrar Nuevo Fiado</h3>
+                    <div class="form-group"><label>Nombre del Deudor</label><input type="text" id="f-name-master" placeholder="Nombre completo" required></div>
+                    
+                    <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px dashed var(--border-clr);">
+                        <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 0.5rem; align-items: flex-end;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Producto</label>
+                                <select id="f-prod-select">
+                                    ${state.inventory.products.map(p => `<option value="${p.id}">${p.name} ($${p.price})</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Cant.</label>
+                                <input type="number" id="f-qty-select" value="1" min="1">
+                            </div>
+                            <button type="button" class="btn btn-outline btn-sm" onclick="app.addFiadoToCart()" style="height:38px;">+</button>
+                        </div>
+
+                        <table class="cart-table" style="margin-top: 1rem; background: white;">
+                            <thead><tr><th>Item</th><th>Cant.</th><th>Subtotal</th><th></th></tr></thead>
+                            <tbody id="fiado-cart-list">
+                                ${app.fiadoCart.map((item, idx) => `
+                                    <tr>
+                                        <td>${item.productName}</td>
+                                        <td>${item.quantity}</td>
+                                        <td>$${item.total.toLocaleString()}</td>
+                                        <td><button type="button" class="btn btn-sm" onclick="app.removeFiadoFromCart(${idx})">×</button></td>
+                                    </tr>
+                                `).join('')}
+                                ${app.fiadoCart.length === 0 ? '<tr><td colspan="4" style="text-align:center;">Carrito vacío</td></tr>' : ''}
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="form-group"><label>Cantidad</label><input type="number" id="f-qty" min="1" value="1" required></div>
+
                     <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                        <button type="submit" class="btn btn-primary">Registrar</button>
-                        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-root').innerHTML = ''">Cancelar</button>
+                        <button type="button" class="btn btn-primary" style="flex: 1;" onclick="app.finalizeFiado()">
+                            Registrar Deuda ($${app.fiadoCart.reduce((a, b) => a + b.total, 0).toLocaleString()})
+                        </button>
+                        <button type="button" class="btn btn-outline" onclick="app.closeFiadoModal()">Cancelar</button>
                     </div>
-                </form>
+                </div>
             </div>
-        </div>
-    `;
-    document.getElementById('fiado-form').onsubmit = (e) => {
-        e.preventDefault();
-        const pId = document.getElementById('f-prod').value;
-        const qty = parseInt(document.getElementById('f-qty').value);
+        `;
+    };
+
+    window.app.addFiadoToCart = () => {
+        const pId = document.getElementById('f-prod-select').value;
+        const qty = parseInt(document.getElementById('f-qty-select').value);
         const product = state.inventory.products.find(p => p.id === pId);
+        const nameVal = document.getElementById('f-name-master').value;
+
+        app.fiadoCart.push({
+            productId: pId,
+            productName: product.name,
+            quantity: qty,
+            total: product.price * qty
+        });
         
+        renderFiadoModal();
+        document.getElementById('f-name-master').value = nameVal; // Keep name
+    };
+
+    window.app.removeFiadoFromCart = (idx) => {
+        const nameVal = document.getElementById('f-name-master').value;
+        app.fiadoCart.splice(idx, 1);
+        renderFiadoModal();
+        document.getElementById('f-name-master').value = nameVal;
+    };
+
+    window.app.finalizeFiado = () => {
+        const name = document.getElementById('f-name-master').value;
+        if (!name || app.fiadoCart.length === 0) {
+            alert("Debe ingresar el nombre y al menos un producto.");
+            return;
+        }
+
         safeAction(() => {
             state.finances.fiados.push({
-                name: document.getElementById('f-name').value,
-                product: product.name,
-                quantity: qty,
-                total: product.price * qty,
+                date: new Date().toLocaleString(),
+                name: name,
+                items: [...app.fiadoCart],
+                total: app.fiadoCart.reduce((a, b) => a + b.total, 0),
                 paid: false
             });
+            app.fiadoCart = [];
             document.getElementById('modal-root').innerHTML = '';
         });
     };
+
+    window.app.closeFiadoModal = () => {
+        app.fiadoCart = [];
+        document.getElementById('modal-root').innerHTML = '';
+    };
+
+    renderFiadoModal();
 };
 
 window.app.markFiadoPaid = (index) => {

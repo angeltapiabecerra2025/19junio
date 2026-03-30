@@ -286,3 +286,83 @@ input:focus, select:focus {
 .badge-paid { background: rgba(16, 185, 129, 0.1); color: var(--success); }
 .badge-pending { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
 .badge-danger { background: rgba(238, 28, 37, 0.1); color: var(--secondary-red); }
+
+/* --- New Elite Styles --- */
+
+.brand-text {
+  background: linear-gradient(135deg, var(--primary-blue) 0%, #6366f1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine 3s infinite alternate;
+}
+
+@keyframes shine {
+  from { filter: hue-rotate(0deg) brightness(1); }
+  to { filter: hue-rotate(10deg) brightness(1.2); }
+}
+
+.socio-grid-container {
+  overflow-x: auto;
+  margin-top: 1.5rem;
+  background: var(--bg-white);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-clr);
+}
+
+.socio-month-header {
+  font-size: 0.65rem;
+  padding: 0.5rem !important;
+  text-align: center !important;
+  min-width: 45px;
+}
+
+.socio-month-cell {
+  padding: 0.25rem !important;
+  text-align: center !important;
+}
+
+.month-badge {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  cursor: default;
+}
+
+.month-paid { background: var(--success); color: white; }
+.month-debt { background: var(--secondary-red); color: white; animation: pulse-red 2s infinite; }
+
+@keyframes pulse-red {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.cart-table {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  border: 1px dashed var(--border-clr);
+  border-radius: 8px;
+}
+
+.cart-table th { padding: 0.5rem; background: #f8fafc; }
+.cart-table td { padding: 0.5rem; }
+
+.total-display {
+  font-family: 'Outfit', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--primary-blue);
+}
+
+.input-total-sync {
+  font-size: 1.5rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--success);
+  border: 2px solid var(--success) !important;
+}

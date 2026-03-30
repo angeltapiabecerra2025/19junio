@@ -13,7 +13,7 @@
     <!-- Charts & PDF Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
     <div class="app-shell">
@@ -21,7 +21,7 @@
         <aside class="sidebar">
             <div class="sidebar-brand" style="flex-direction: column; text-align: center; gap: 0.5rem; padding-bottom: 2rem;">
                 <img src="img/logo.png" alt="Logo Club" style="max-width: 100px; height: auto; border-radius: 50%;">
-                <span style="font-family: 'Outfit', sans-serif; letter-spacing: 1px;">19 DE JUNIO</span>
+                <span class="brand-text" style="font-family: 'Outfit', sans-serif; letter-spacing: 2px; font-weight: 800; font-size: 1.2rem; background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">19 de JUNIO APP</span>
             </div>
             <nav class="nav-links">
                 <a href="#dashboard" class="nav-link active" data-view="dashboard">
@@ -103,6 +103,6 @@
     <div id="modal-root"></div>
 
     <!-- Scripts -->
-    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/app.js"></script>
 </body>
 </html>
